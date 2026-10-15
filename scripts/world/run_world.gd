@@ -115,6 +115,28 @@ func _enter_room(r: Room) -> void:
 			_offer_reward(r)
 		elif r.kind == Room.Kind.SHOP or r.kind == Room.Kind.REST:
 			_populate_service_room(r)
+		elif r.kind == Room.Kind.EVENT:
+			_populate_event_room(r)
+
+
+## 事件房：落地一个「未登记信号源」，玩家可以走过去接入，也可以当没看见
+func _populate_event_room(r: Room) -> void:
+	if not (r.payload is Dictionary):
+		r.payload = {}
+	if bool(r.payload.get("event_spawned", false)):
+		return
+	r.payload["event_spawned"] = true
+	if str(r.payload.get("event_id", "")) == "":
+		r.payload["event_id"] = EventDB.roll_event(run.rng, run.floor_index)
+
+	var node := Interactable.new()
+	node.setup("event_node", "未登记信号源", "接入信号源", Vector2(52.0, 84.0), UITheme.VIOLET)
+	node.position = Vector2(r.center().x, r.floor_y)
+	node.set_meta("room_ref", r)
+	r.payload["event_node"] = node
+	_enemies_layer.add_child(node)
+	Sfx.play("terminal", -12.0)
+	Events.toast.emit("检测到未登记信号源", UITheme.VIOLET)
 
 
 ## 商店房 / 休整房：落地一个服务终端，别让这两类房间空跑

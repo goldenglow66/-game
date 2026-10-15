@@ -53,6 +53,7 @@ func _ready() -> void:
 	_build()
 	Events.banner.connect(_on_banner)
 	Events.subtitle.connect(_on_subtitle)
+	Events.hack_progress.connect(_on_hack_progress)
 	Events.toast.connect(_on_toast)
 	Events.player_spawned.connect(_on_player_spawned)
 	Events.hub_interact.connect(_on_hub_interact)
@@ -374,7 +375,7 @@ func _on_hub_interact(kind: String, _source: Node) -> void:
 
 
 ## 只在出击途中才会出现的面板（局内售货机 / 维修节点）
-const RUN_PANELS := ["field_market", "rest_node"]
+const RUN_PANELS := ["field_market", "rest_node", "event_node"]
 
 
 func open_panel(kind: String) -> void:
@@ -426,7 +427,161 @@ func _rebuild_panel() -> void:
 		"exit": _build_exit()
 		"field_market": _build_field_market()
 		"rest_node": _build_rest_node()
+		"event_node": _build_event_node()
 		_: _build_unknown()
+
+
+# ---------- 事件房：未登记信号源 ----------
+
+func _build_event_node() -> void:
+	var run := Game.run
+	if run == null:
+		_build_unknown()
+		return
+	var room := _current_service_room()
+	var eid := ""
+	var used := false
+	if room != null and room.payload is Dictionary:
+		eid = str(room.payload.get("event_id", ""))
+		used = bool(room.payload.get("event_used", false))
+	var ev := EventDB.get_event(eid)
+	if ev.is_empty():
+		_build_unknown()
+		return
+
+	panel_title.text = str(ev.get("title", "未登记信号源"))
+	panel_body.add_child(UITheme.label(str(ev.get("subtitle", "")), 15, UITheme.VIOLET))
+	panel_body.add_child(UITheme.spacer(4))
+	panel_body.add_child(UITheme.rich("[color=#a98bf0]%s[/color]：[i]%s[/i]" % [
+		str(ev.get("speaker", "")), str(ev.get("line", ""))], 17))
+	panel_body.add_child(UITheme.divider(Color("1b2130"), 1))
+	panel_body.add_child(UITheme.spacer(2))
+
+	if used:
+		panel_body.add_child(UITheme.label("信号已经断开，只剩下载波噪声。", 16, UITheme.TEXT_DIM))
+		panel_body.add_child(_mk_button("离开", UITheme.PANEL_LINE, func(): close_panel()))
+		panel_footer.text = "信号源已静默"
+		return
+
+	var options: Array = ev.get("options", [])
+	for i: int in options.size():
+		var opt: Dictionary = options[i]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		var info := VBoxContainer.new()
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.add_theme_constant_override("separation", 0)
+		info.add_child(UITheme.label("%d. %s" % [i + 1, str(opt.get("label", ""))], 17, UITheme.TEXT_BRIGHT))
+		var hint := EventDB.afford_hint(opt, run)
+		var desc := str(opt.get("desc", ""))
+		if hint != "":
+			desc = "%s　（%s）" % [desc, hint]
+		info.add_child(UITheme.label(desc, 14, UITheme.RED if hint != "" else UITheme.TEXT_DIM))
+		row.add_child(info)
+		var idx := i
+		var btn := _mk_button("选择", UITheme.VIOLET, func(): _do_event_option(idx))
+		btn.disabled = not EventDB.can_afford(opt, run)
+		btn.custom_minimum_size = Vector2(96, 0)
+		row.add_child(btn)
+		panel_body.add_child(row)
+		panel_body.add_child(UITheme.divider(Color("1b2130"), 1))
+
+	panel_body.add_child(_mk_button("什么都不做（Esc）", UITheme.PANEL_LINE, func(): close_panel()))
+	panel_footer.text = "未登记信号源 · 接入是单向的"
+
+
+func _do_event_option(idx: int) -> void:
+	var run := Game.run
+	var room := _current_service_room()
+	if run == null or room == null or not (room.payload is Dictionary):
+		return
+	var ev := EventDB.get_event(str(room.payload.get("event_id", "")))
+	if ev.is_empty():
+		close_panel()
+		return
+	var options: Array = ev.get("options", [])
+	if idx < 0 or idx >= options.size():
+		return
+	var opt: Dictionary = options[idx]
+	if not EventDB.can_afford(opt, run):
+		Sfx.play("ui_deny")
+		return
+
+	# 1) 代价
+	if opt.has("cost_coins"):
+		run.coins = maxi(0, run.coins - int(opt["cost_coins"]))
+	if opt.has("cost_shards"):
+		run.shards = maxi(0, run.shards - int(opt["cost_shards"]))
+
+	# 2) 附加收益（与主效果独立，可以同时写在一条选项里）
+	if opt.has("shards"):
+		run.add_shards(int(opt["shards"]))
+	if opt.has("coins"):
+		run.add_coins(int(opt["coins"]))
+	if opt.has("pollution"):
+		var pv := float(opt["pollution"])
+		if pv >= 0.0:
+			run.add_pollution(pv)
+		else:
+			run.reduce_pollution(-pv)
+	if bool(opt.get("heal_full", false)):
+		run.heal(run.max_hp)
+	if opt.has("consumable"):
+		var ck := str(opt["consumable"])
+		var held := int(run.consumables.get(ck, 0))
+		run.consumables[ck] = mini(RunState.CONSUMABLE_CAP, held + 1)
+
+	# 3) 主效果
+	var note := ""
+	var effect := str(opt.get("effect", EventDB.OPT_NONE))
+	if effect == EventDB.OPT_SHARDS:
+		var amt := int(opt.get("amount", 0))
+		run.add_shards(amt)
+		note = "回收织网碎片 ×%d" % amt
+	elif effect == EventDB.OPT_COINS:
+		var amt2 := int(opt.get("amount", 0))
+		run.add_coins(amt2)
+		note = "盲区币 +%d" % amt2
+	elif effect == EventDB.OPT_HEAL:
+		run.heal(float(opt.get("amount", 20)))
+		note = "外壳已修补"
+	elif effect == EventDB.OPT_MAX_HP:
+		var add := float(opt.get("amount", 0.0))
+		run.bonus_max_hp += add
+		run.recalc(false)
+		Events.player_hp_changed.emit(run.hp, run.max_hp)
+		note = "外壳上限 +%d" % int(add)
+	elif effect == EventDB.OPT_POLLUTION:
+		note = "污染已压制" if float(opt.get("pollution", 0.0)) < 0.0 else "污染上升"
+	elif effect == EventDB.OPT_CONSUMABLE:
+		note = "补给已入包"
+	elif effect == EventDB.OPT_INTEL:
+		if Game.add_intel(str(opt.get("intel", ""))):
+			note = "新情报已归档"
+		else:
+			note = "这段情报你已经解码过了"
+	elif effect == EventDB.OPT_EXTRA_REWARD:
+		note = "改写机会 +1"
+	else:
+		note = str(opt.get("label", ""))
+	if note == "":
+		note = str(opt.get("label", ""))
+
+	room.payload["event_used"] = true
+	Sfx.play("ui_confirm")
+	Events.toast.emit(note, UITheme.VIOLET)
+
+	# 4) 额外一次三选一：把事件面板关掉，走正常的奖励流程
+	var wants_extra := effect == EventDB.OPT_EXTRA_REWARD or bool(opt.get("extra_reward", false))
+	if wants_extra:
+		close_panel()
+		var choices := UpgradeDB.roll_choices(run.rng, 3, run.stacks, run.floor_index)
+		if not choices.is_empty():
+			run.pending_choice = choices
+			Events.reward_choices_offered.emit(choices)
+		return
+
+	_rebuild_panel()
 
 
 # ---------- 局内服务房：自动售货机 / 维修节点 ----------
@@ -850,6 +1005,16 @@ func _on_subtitle(text: String, speaker: String) -> void:
 	subtitle_timer = 4.4
 
 
+func _on_hack_progress(target: Node, ratio: float) -> void:
+	if hud == null:
+		return
+	hud.hack_ratio = ratio
+	hud.hack_label = ""
+	if target != null and is_instance_valid(target) and target.has_method("label"):
+		hud.hack_label = str(target.call("label"))
+	hud.queue_redraw()
+
+
 func _on_toast(text: String, color: Color) -> void:
 	var l := UITheme.label(text, 16, color)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -1046,6 +1211,8 @@ class HudLayer extends Control:
 	var run_ref: RunState = null
 	var in_run: bool = false
 	var boss_ref: Node = null
+	var hack_ratio: float = 0.0
+	var hack_label: String = ""
 	var _t: float = 0.0
 
 	func tick(delta: float) -> void:
@@ -1122,6 +1289,21 @@ class HudLayer extends Control:
 		# Boss 血条：屏幕下方居中，只在 Boss 还活着的时候出现
 		if boss_ref != null and is_instance_valid(boss_ref) and bool(boss_ref.call("is_alive")):
 			_draw_boss_bar(f, boss_ref)
+
+		# 骇入进度条：屏幕中下偏上，与 Boss 血条分开
+		if hack_ratio > 0.0:
+			_draw_hack_bar(f)
+
+	func _draw_hack_bar(f: Font) -> void:
+		var hw := 300.0
+		var hx := (size.x - hw) * 0.5
+		var hy := size.y - 232.0
+		_bar(Rect2(hx, hy, hw, 10.0), hack_ratio, UITheme.CYAN)
+		_text_r(f, Vector2(hx + hw + 12.0, hy + 9.5), "%d%%" % int(hack_ratio * 100.0), 12, UITheme.CYAN)
+		var title := "骇入中"
+		if hack_label != "":
+			title = "骇入中 · %s" % hack_label
+		_text(f, Vector2(hx, hy - 5.0), title, 13, Color(UITheme.CYAN.r, UITheme.CYAN.g, UITheme.CYAN.b, 0.92))
 
 	func _draw_boss_bar(f: Font, b: Node) -> void:
 		var bw := 640.0

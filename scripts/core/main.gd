@@ -63,6 +63,10 @@ func _ready() -> void:
 		_run_servicecheck()
 	elif OS.get_cmdline_user_args().has("--pausecheck"):
 		_run_pausecheck()
+	elif OS.get_cmdline_user_args().has("--hackcheck"):
+		_run_hackcheck()
+	elif OS.get_cmdline_user_args().has("--eventcheck"):
+		_run_eventcheck()
 	elif OS.get_cmdline_user_args().has("--shot"):
 		_run_shots()
 
@@ -189,6 +193,34 @@ func _run_shots() -> void:
 			print("[SHOTS] boss bar node = ", ui.get("_boss"))
 		else:
 			print("[SHOTS] WARN no boss room")
+
+	# 幽灵骇入：找一间还没打的战斗房 → 幽灵形态 → 起手 → 推进到进度中段截图
+	var world4: Node = current_world
+	if world4 != null:
+		var lvl4 = world4.get("level")
+		var p4: Player = world4.get("player")
+		var hack_room: Room = null
+		for r4: Room in lvl4.rooms:
+			if r4.kind == Room.Kind.COMBAT and not r4.cleared:
+				hack_room = r4
+				break
+		if hack_room != null:
+			p4.global_position = Vector2(hack_room.x_start + 620.0, hack_room.floor_y - 80.0)
+			p4.velocity = Vector2.ZERO
+			await get_tree().create_timer(1.0).timeout
+			Game.run.ge = Game.run.max_ge
+			p4.call("_set_ghost", true)
+			await get_tree().create_timer(0.15).timeout
+			p4.call("_begin_hack")
+			print("[SHOTS] hack started=", p4.call("is_hacking"),
+				" need=", p4.get("hack_need"), " target=", p4.get("hack_target"))
+			for i: int in 8:
+				p4.call("_update_hack", 0.09)
+			await _shot("16_hack")
+			p4.call("_cancel_hack", "shot")
+			p4.call("_set_ghost", false)
+		else:
+			print("[SHOTS] WARN no uncleared combat room for hack")
 
 	print("[SHOTS] done")
 	get_tree().paused = false
@@ -463,6 +495,275 @@ func _run_bosscheck() -> void:
 	get_tree().quit()
 
 
+# ================= 事件房自检（--eventcheck） =================
+
+func _run_eventcheck() -> void:
+	print("[EVENT] start")
+	begin_run(4242)
+	await get_tree().create_timer(0.6).timeout
+
+	var w = current_world
+	if w == null:
+		print("[EVENT] FAIL no world")
+		get_tree().quit()
+		return
+	var lvl = w.get("level")
+	var p: Player = w.get("player")
+	var run := Game.run
+
+	var kinds: Array[String] = []
+	for r: Room in lvl.rooms:
+		kinds.append("%d:%s" % [int(r.index), r.kind_name()])
+	print("[EVENT] rooms = ", kinds)
+
+	# 事件房不是每层都有：没有就把一间普通战斗房改造成事件房来验证
+	var room: Room = null
+	for r2: Room in lvl.rooms:
+		if r2.kind == Room.Kind.EVENT:
+			room = r2
+			break
+	if room == null:
+		for r3: Room in lvl.rooms:
+			if r3.kind == Room.Kind.COMBAT and r3.index > 0:
+				r3.kind = Room.Kind.EVENT
+				r3.spawn_count = 0
+				r3.enemy_ids = []
+				if not (r3.payload is Dictionary):
+					r3.payload = {}
+				room = r3
+				print("[EVENT] 本层无事件房，强制把房间 %d 改造为事件房" % int(r3.index))
+				break
+	if room == null:
+		print("[EVENT] FAIL 找不到可用房间")
+		get_tree().quit()
+		return
+
+	# 先走到房间外面，再走进去，让 _enter_room 完整跑一遍
+	p.global_position = Vector2(room.x_start - 220.0, room.floor_y - 60.0)
+	p.velocity = Vector2.ZERO
+	await get_tree().create_timer(0.4).timeout
+	p.global_position = Vector2(room.center().x, room.floor_y - 60.0)
+	p.velocity = Vector2.ZERO
+	await get_tree().create_timer(0.7).timeout
+
+	print("[EVENT] room=%d kind=%s payload=%s" % [
+		int(room.index), room.kind_name(), str(room.payload.keys())])
+	var eid := str(room.payload.get("event_id", ""))
+	var ev := EventDB.get_event(eid)
+	var opts: Array = ev.get("options", [])
+	print("[EVENT] event=%s title=%s options=%d" % [eid, str(ev.get("title", "")), opts.size()])
+	if ev.is_empty():
+		print("[EVENT] FAIL 事件未生成")
+		get_tree().quit()
+		return
+
+	run.coins = 500
+	run.shards = 200
+	run.recalc(false)
+	ui.open_panel("event_node")
+	await get_tree().create_timer(0.25).timeout
+	print("[EVENT] panel open=%s title=%s rows=%d footer=%s" % [
+		str(ui.panel_open), ui.panel_title.text, ui.panel_body.get_child_count(), ui.panel_footer.text])
+
+	# --- 选项 0：图尔克买坐标（-60 盲区币，换一次额外三选一） ---
+	room.payload["event_id"] = "turck_stall"
+	room.payload["event_used"] = false
+	ui.call("_rebuild_panel")
+	await get_tree().create_timer(0.15).timeout
+	var coins_before := run.coins
+	ui.call("_do_event_option", 0)
+	await get_tree().create_timer(0.5).timeout
+	var reward_open := ui.reward != null and ui.reward.is_open()
+	print("[EVENT] opt0: 盲区币 %d -> %d (cost 60) reward_open=%s paused=%s used=%s" % [
+		coins_before, run.coins, str(reward_open), str(get_tree().paused),
+		str(room.payload.get("event_used", false))])
+	print("[EVENT]   %s" % ("OK 额外三选一已弹出" if (coins_before - run.coins == 60 and reward_open) else "FAIL"))
+	if reward_open:
+		ui.reward.call("_confirm")
+		await get_tree().create_timer(0.5).timeout
+
+	# --- 选项 0：茧化残骸（本局最大耐久 +30） ---
+	room.payload["event_id"] = "cocoon_husk"
+	room.payload["event_used"] = false
+	var hp_before := run.max_hp
+	ui.open_panel("event_node")
+	await get_tree().create_timer(0.2).timeout
+	ui.call("_do_event_option", 0)
+	await get_tree().create_timer(0.3).timeout
+	run.recalc(false)
+	print("[EVENT] cocoon max_hp: %.0f -> %.0f (bonus=%.0f)  %s" % [
+		hp_before, run.max_hp, run.bonus_max_hp,
+		"OK" if run.max_hp > hp_before else "FAIL"])
+
+	# --- 选项 1：记忆水面取样（+15 碎片） ---
+	room.payload["event_id"] = "memory_pool"
+	room.payload["event_used"] = false
+	var sh_before := run.shards
+	ui.open_panel("event_node")
+	await get_tree().create_timer(0.2).timeout
+	ui.call("_do_event_option", 1)
+	await get_tree().create_timer(0.3).timeout
+	print("[EVENT] memory_pool shards: %d -> %d  %s" % [
+		sh_before, run.shards, "OK" if run.shards > sh_before else "FAIL"])
+
+	# --- 选项 1：裁断信使交碎片换情报（-50 碎片 + 情报 + 额外三选一） ---
+	room.payload["event_id"] = "covenant_courier"
+	room.payload["event_used"] = false
+	var sh2 := run.shards
+	ui.open_panel("event_node")
+	await get_tree().create_timer(0.2).timeout
+	ui.call("_do_event_option", 1)
+	await get_tree().create_timer(0.5).timeout
+	var has_intel: bool = Game.intel_seen.has("intel_covenant_truth")
+	print("[EVENT] courier shards: %d -> %d (cost 50) intel=%s reward_open=%s  %s" % [
+		sh2, run.shards, str(has_intel), str(ui.reward != null and ui.reward.is_open()),
+		"OK" if (sh2 - run.shards == 50 and has_intel) else "FAIL"])
+	if ui.reward != null and ui.reward.is_open():
+		ui.reward.call("_confirm")
+		await get_tree().create_timer(0.4).timeout
+
+	# --- 余额不足时选项必须被禁用 ---
+	room.payload["event_id"] = "turck_stall"
+	room.payload["event_used"] = false
+	run.coins = 10
+	ui.open_panel("event_node")
+	await get_tree().create_timer(0.2).timeout
+	var affordable := EventDB.can_afford(EventDB.DB["turck_stall"]["options"][0], run)
+	var hint := EventDB.afford_hint(EventDB.DB["turck_stall"]["options"][0], run)
+	print("[EVENT] 余额 10 时买坐标 can_afford=%s hint=%s  %s" % [
+		str(affordable), hint, "OK" if not affordable else "FAIL"])
+	ui.close_panel()
+
+	print("[EVENT] done")
+	get_tree().quit()
+
+
+# ================= 幽灵骇入自检（--hackcheck） =================
+
+func _run_hackcheck() -> void:
+	print("[HACK] start")
+	begin_run(777)
+	await get_tree().create_timer(0.6).timeout
+
+	var w = current_world
+	if w == null:
+		print("[HACK] FAIL no world")
+		get_tree().quit()
+		return
+	var lvl = w.get("level")
+	var p: Player = w.get("player")
+	var run := Game.run
+
+	var combat = null
+	for r in lvl.get("rooms"):
+		if int(r.kind) == 1 and int(r.spawn_count) > 0:
+			combat = r
+			break
+	if combat == null:
+		print("[HACK] FAIL no combat room")
+		get_tree().quit()
+		return
+	p.global_position = Vector2(combat.x_start + 620.0, combat.floor_y - 80.0)
+	p.velocity = Vector2.ZERO
+	await get_tree().create_timer(1.2).timeout
+
+	var enemies: Array = []
+	for n in get_tree().get_nodes_in_group("enemies"):
+		enemies.append(n)
+	print("[HACK] combat room=%d enemies=%d" % [int(combat.index), enemies.size()])
+	if enemies.is_empty():
+		print("[HACK] FAIL no enemies spawned")
+		get_tree().quit()
+		return
+	for e in enemies:
+		print("[HACK]   %s  resist=%.2f  hp=%.0f" % [
+			str(e.call("label")), float(e.call("hack_resist")), float(e.get("hp"))])
+
+	# ---- 成功路径（挑最容易骇的目标，好走「瘫痪」分支） ----
+	var target = enemies[0]
+	var best_resist := 999.0
+	for e in enemies:
+		var rr := float(e.call("hack_resist"))
+		if rr < best_resist:
+			best_resist = rr
+			target = e
+	print("[HACK] picked target = %s (resist %.2f)" % [str(target.call("label")), best_resist])
+	run.ge = run.max_ge
+	p.global_position = target.global_position + Vector2(90.0, -20.0)
+	p.call("_set_ghost", true)
+	await get_tree().create_timer(0.2).timeout
+	print("[HACK] ghost=%s ge=%.0f" % [str(p.ghost_form), run.ge])
+
+	var hp_before: float = float(target.get("hp"))
+	p.call("_begin_hack")
+	var started := bool(p.call("is_hacking"))
+	print("[HACK] begin: hacking=%s need=%.2fs ge=%.0f" % [
+		str(started), float(p.get("hack_need")), run.ge])
+	if not started:
+		print("[HACK] FAIL hack did not start")
+		get_tree().quit()
+		return
+
+	var ticks := 0
+	while bool(p.call("is_hacking")) and ticks < 80:
+		p.call("_update_hack", 0.12)
+		ticks += 1
+	var hp_after: float = float(target.get("hp"))
+	print("[HACK] done in %d ticks: stun=%s hp %.0f -> %.0f (dealt %.0f) alive=%s" % [
+		ticks, str(target.call("is_hack_stunned")), hp_before, hp_after, hp_before - hp_after,
+		str(target.call("is_alive"))])
+	print("[HACK] %s" % ("OK damage applied" if hp_after < hp_before else "FAIL no damage"))
+
+	# ---- 中断路径 A：脱离幽灵形态 ----
+	var t2 = null
+	for e in enemies:
+		if is_instance_valid(e) and bool(e.call("can_be_hacked")) and e != target:
+			t2 = e
+			break
+	if t2 == null:
+		print("[HACK] (no second target for interrupt test)")
+	else:
+		run.ge = run.max_ge
+		p.call("_set_ghost", true)
+		p.global_position = t2.global_position + Vector2(90.0, -20.0)
+		p.call("_begin_hack")
+		var a_started := bool(p.call("is_hacking"))
+		p.call("_set_ghost", false)
+		p.call("_update_hack", 0.05)
+		var a_broken := not bool(p.call("is_hacking"))
+		print("[HACK] break by leaving ghost: started=%s broken=%s  %s" % [
+			str(a_started), str(a_broken), "OK" if (a_started and a_broken) else "FAIL"])
+
+		# ---- 中断路径 B：拉开距离 ----
+		run.ge = run.max_ge
+		p.call("_set_ghost", true)
+		p.global_position = t2.global_position + Vector2(90.0, -20.0)
+		p.call("_begin_hack")
+		var b_started := bool(p.call("is_hacking"))
+		p.global_position = t2.global_position + Vector2(900.0, 0.0)
+		p.call("_update_hack", 0.05)
+		var b_broken := not bool(p.call("is_hacking"))
+		print("[HACK] break by distance: started=%s broken=%s  %s" % [
+			str(b_started), str(b_broken), "OK" if (b_started and b_broken) else "FAIL"])
+
+		# ---- 中断路径 C：能量耗尽 ----
+		p.global_position = t2.global_position + Vector2(90.0, -20.0)
+		run.ge = 30.0
+		p.call("_begin_hack")
+		var c_started := bool(p.call("is_hacking"))
+		var guard := 0
+		while bool(p.call("is_hacking")) and guard < 80:
+			p.call("_update_hack", 0.12)
+			guard += 1
+		print("[HACK] break by energy: started=%s ge=%.0f ghost=%s  %s" % [
+			str(c_started), run.ge, str(p.ghost_form),
+			"OK" if (c_started and not bool(p.call("is_hacking"))) else "FAIL"])
+		p.call("_set_ghost", false)
+
+	print("[HACK] done")
+	get_tree().quit()
+
+
 # ================= 暂停自检（--pausecheck） =================
 
 func _run_pausecheck() -> void:
@@ -646,7 +947,7 @@ func _run_elementcheck() -> void:
 	if p != null:
 		Game.run.weapon["elements_owned"] = ["basic", "emp"]
 		Game.run.set_element("emp")
-		var before_n := p.get_parent().get_child_count()
+		var before_n: int = p.get_parent().get_child_count()
 		p.call("_fire_projectiles", Game.run.current_element())
 		await get_tree().create_timer(0.1).timeout
 		var found := 0

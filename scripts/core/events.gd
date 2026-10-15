@@ -23,6 +23,7 @@ signal hitstop_requested(duration: float)
 signal shake_requested(amount: float, duration: float)
 signal perfect_guard(position: Vector2)
 signal hack_completed(target: Node)
+signal hack_progress(target: Node, ratio: float)   # ratio 0..1；target 为 null 表示骇入结束
 
 # ---------------- 局内流程 ----------------
 signal run_started(seed_value: int)

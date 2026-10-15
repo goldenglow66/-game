@@ -17,6 +17,9 @@ var start_time_ms: int = 0
 
 # ---------------- 资源 ----------------
 var max_hp: float = 120.0
+## 本局内的一次性上限加成（事件奖励等）。recalc() 会从 base + 词条重算 max_hp，
+## 所以这类加成必须单独记着，否则下一次重算就把它抹掉了。
+var bonus_max_hp: float = 0.0
 var hp: float = 120.0
 var max_ge: float = 80.0
 var ge: float = 80.0
@@ -173,7 +176,7 @@ func recalc(init_vitals: bool = false) -> void:
 		s["all_damage_mult"] = float(s["all_damage_mult"]) + float(s["pollution_power"]) * floor(pollution / 20.0)
 
 	stats = s
-	max_hp = float(s["max_hp"])
+	max_hp = float(s["max_hp"]) + bonus_max_hp
 	max_ge = float(s["max_ge"])
 	max_st = float(s["max_st"])
 	max_heat = float(s["max_heat"])

@@ -12,9 +12,9 @@ config_version=5
 
 config/name="笼中墟影 / Ghost in the Iron Shell"
 config/description="科幻横板动作肉鸽。剑、盾、铳三位一体，幽灵形态骇入网络。"
+run/main_scene="res://scenes/Main.tscn"
 config/use_custom_user_dir=true
 config/custom_user_dir_name="cage-shadow"
-run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]

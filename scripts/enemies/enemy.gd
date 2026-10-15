@@ -57,6 +57,9 @@ var dot_dps: float = 0.0
 var probe_mark_t: float = 0.0
 var spawn_t: float = 0.0
 
+# 骇入：幽灵形态下的核心交互。敌方只负责「被骇」的进度与后果，发起方在 player.gd。
+var hack_stun_t: float = 0.0
+
 var _combo_left: int = 0
 var _home_x: float = 0.0
 var _patrol_dir: int = 1
@@ -104,6 +107,7 @@ func _ready() -> void:
 	collision_layer = 4
 	collision_mask = 1
 	z_index = 16
+	add_to_group("enemies")
 	_home_x = global_position.x
 	_patrol_dir = 1 if randf() < 0.5 else -1
 	facing = _patrol_dir
@@ -149,6 +153,82 @@ func probe_mark(duration: float = 6.0) -> void:
 	probe_mark_t = maxf(probe_mark_t, duration)
 
 
+# ================= 骇入（幽灵形态的核心交互） =================
+
+## 骇入抗性：系数越大耗时越久。对应设定文档的类别克制——智能体最好骇，异常生物几乎骇不动。
+func hack_resist() -> float:
+	var base := 1.0
+	match category:
+		EnemyDB.Cat.AI_CORE:
+			base = 0.55
+		EnemyDB.Cat.MACHINE:
+			base = 0.85
+		EnemyDB.Cat.HUMAN:
+			base = 1.25
+		EnemyDB.Cat.GHOST:
+			base = 1.55
+		EnemyDB.Cat.BIO:
+			base = 2.30
+	if is_elite:
+		base *= 1.7
+	return base
+
+
+func can_be_hacked() -> bool:
+	return not _dead and hp > 0.0
+
+
+func is_hack_stunned() -> bool:
+	return hack_stun_t > 0.0
+
+
+## 显示名：Boss 用 become_boss() 挂的名字，其余用档案里的中文名。
+func label() -> String:
+	if display_name != "":
+		return display_name
+	return str(def.get("name", id))
+
+
+## 骇入完成：按类别给出不同后果，并附带一次不能格挡的真实伤害。
+func apply_hack_result() -> void:
+	if not can_be_hacked():
+		return
+	var pos: Vector2 = global_position + Vector2(0.0, -float(def.get("h", 46.0)) * 0.55)
+	var popup := "瘫痪"
+	var col := Color("6fe0ff")
+	var element := "emp"
+	match category:
+		EnemyDB.Cat.HUMAN:
+			popup = "神经过载"
+			col = Color("ffb347")
+			poise = 0.0
+		EnemyDB.Cat.GHOST:
+			popup = "回响撕裂"
+			col = Color("a98bf0")
+			probe_mark(4.0)
+		EnemyDB.Cat.BIO:
+			popup = "痛觉过载"
+			col = Color("e0554f")
+			element = "burn"
+		_:
+			hack_stun_t = 3.6
+	FXLite.spawn_ring(get_parent(), pos, col, 120.0, 3.5)
+	FXLite.spawn_float_text(get_parent(), pos, popup, col)
+	Sfx.play("hack_done", -3.0)
+	Game.do_hitstop(0.09)
+	Events.hack_completed.emit(self)
+	take_hit({
+		"amount": max_hp * 0.18 + 14.0,
+		"kind": "hack",
+		"element": element,
+		"poise": 9999.0,
+		"crit": true,
+		"position": pos,
+		"source_position": pos,
+		"knockback": Vector2.ZERO,
+	})
+
+
 # ================= 主循环 =================
 
 func _physics_process(delta: float) -> void:
@@ -168,6 +248,18 @@ func _physics_process(delta: float) -> void:
 	_tick_status(delta)
 
 	if hp <= 0.0:
+		return
+
+	if hack_stun_t > 0.0:
+		# 被骇入瘫痪：整机停机，只保留重力与地面摩擦，不思考也不出手
+		hack_stun_t = maxf(0.0, hack_stun_t - delta)
+		state = State.HURT
+		state_t = 0.0
+		velocity.x = move_toward(velocity.x, 0.0, 1400.0 * delta)
+		if behavior != EnemyDB.FLYER:
+			velocity.y = minf(MAX_FALL, velocity.y + GRAVITY * delta)
+		move_and_slide()
+		queue_redraw()
 		return
 
 	state_t += delta

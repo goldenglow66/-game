@@ -48,6 +48,13 @@ const LAYER_WORLD := 1
 const LAYER_ENEMY := 4
 const LAYER_INTERACT := 128
 
+# 幽灵骇入：幽灵形态下按 E 对敌人建立连接，持续到进度满或中断
+const HACK_RANGE := 230.0        # 建立连接的极限距离
+const HACK_BREAK_RANGE := 322.0  # 超出这个距离连接断裂（约 1.4 倍）
+const HACK_COST := 18.0          # 起手消耗的幽灵能量
+const HACK_DRAIN := 5.0          # 骇入期间每秒额外消耗
+const HACK_BASE_TIME := 1.5      # 基准耗时，再乘以目标的骇入抗性
+
 signal ghost_form_changed(active: bool)
 
 # ---------------- 状态 ----------------
@@ -75,6 +82,11 @@ var ghost_lean: float = 0.0
 var heat_locked: bool = false
 var shoot_cd: float = 0.0
 var probe_cd: float = 0.0
+
+var hack_target: Enemy = null
+var hack_t: float = 0.0
+var hack_need: float = 1.5
+var hack_tick_t: float = 0.0
 
 var anim_t: float = 0.0
 var flash_t: float = 0.0
@@ -132,6 +144,7 @@ func _physics_process(delta: float) -> void:
 	_apply_physics(delta)
 	_update_vitals(delta)
 	_update_interactable()
+	_update_hack(delta)
 
 	move_and_slide()
 
@@ -582,6 +595,104 @@ func _do_probe() -> void:
 		Events.toast.emit("回波命中 %d 个信号" % found, UITheme.CYAN)
 
 
+# ================= 幽灵骇入 =================
+#
+# 幽灵形态下按 E 对最近的敌人建立连接：进度条走满即生效，中途退出幽灵形态、
+# 拉太远、被打中、或能量耗尽都会断线。抗性由目标类别决定（智能体最好骇，异常生物最难）。
+
+func _nearest_hackable() -> Enemy:
+	var best: Enemy = null
+	var best_d := HACK_RANGE
+	for n in get_tree().get_nodes_in_group("enemies"):
+		var e := n as Enemy
+		if e == null or not e.can_be_hacked():
+			continue
+		var d := global_position.distance_to(e.global_position)
+		if d < best_d:
+			best_d = d
+			best = e
+	return best
+
+
+func _begin_hack() -> void:
+	var run := Game.run
+	if run == null:
+		return
+	var e := _nearest_hackable()
+	if e == null:
+		Sfx.play("ui_deny", -8.0)
+		Events.toast.emit("附近没有可骇入的信号", UITheme.TEXT_DIM)
+		return
+	if run.ge < HACK_COST:
+		Sfx.play("ui_deny", -8.0)
+		Events.toast.emit("幽灵能量不足（需要 %d）" % int(HACK_COST), UITheme.RED)
+		return
+	run.ge = maxf(0.0, run.ge - HACK_COST)
+	Events.player_ge_changed.emit(run.ge, run.max_ge)
+	hack_target = e
+	hack_t = 0.0
+	hack_need = HACK_BASE_TIME * e.hack_resist()
+	hack_tick_t = 0.0
+	Sfx.play("hack_tick", -6.0)
+	Events.hack_progress.emit(e, 0.0)
+
+
+func _update_hack(delta: float) -> void:
+	if hack_target == null:
+		return
+	if not is_instance_valid(hack_target) or not hack_target.can_be_hacked():
+		_cancel_hack("连接对象已损毁")
+		return
+	if not ghost_form:
+		_cancel_hack("脱离幽灵形态")
+		return
+	if global_position.distance_to(hack_target.global_position) > HACK_BREAK_RANGE:
+		_cancel_hack("超出连接距离")
+		return
+	var run := Game.run
+	if run == null:
+		return
+
+	run.ge -= HACK_DRAIN * run.mult("ghost_cost_mult") * delta
+	if run.ge <= 0.0:
+		run.ge = 0.0
+		Events.player_ge_changed.emit(run.ge, run.max_ge)
+		_cancel_hack("幽灵能量耗尽")
+		_set_ghost(false)
+		return
+	Events.player_ge_changed.emit(run.ge, run.max_ge)
+
+	hack_t += delta / maxf(0.25, hack_need)
+	hack_tick_t -= delta
+	if hack_tick_t <= 0.0:
+		hack_tick_t = 0.14
+		Sfx.play_varied("hack_tick", -12.0, 0.20)
+	Events.hack_progress.emit(hack_target, clampf(hack_t, 0.0, 1.0))
+
+	if hack_t >= 1.0:
+		var victim := hack_target
+		hack_target = null
+		hack_t = 0.0
+		Events.hack_progress.emit(null, 0.0)
+		victim.apply_hack_result()
+		Events.toast.emit("骇入完成 · %s" % victim.label(), UITheme.CYAN)
+
+
+func _cancel_hack(reason: String) -> void:
+	if hack_target == null:
+		return
+	hack_target = null
+	hack_t = 0.0
+	Events.hack_progress.emit(null, 0.0)
+	Sfx.play("hack_fail", -8.0)
+	if reason != "":
+		Events.toast.emit("骇入中断 · %s" % reason, UITheme.RED)
+
+
+func is_hacking() -> bool:
+	return hack_target != null and is_instance_valid(hack_target)
+
+
 func _toggle_ghost() -> void:
 	_set_ghost(not ghost_form)
 
@@ -606,6 +717,9 @@ func _set_ghost(active: bool) -> void:
 		collision_mask = LAYER_WORLD | LAYER_INTERACT
 		velocity = Vector2.ZERO
 		Sfx.play("ghost_exit", -4.0)
+		# 退出相位时连接必然断开（_update_hack 也会兜底，这里保证同一帧就断）
+		if hack_target != null:
+			_cancel_hack("脱离幽灵形态")
 	ghost_form_changed.emit(active)
 	Events.ghost_form_changed.emit(active)
 
@@ -619,6 +733,9 @@ func take_hit(info: Dictionary) -> void:
 	var kind: String = info.get("kind", "melee")
 	if iframe_t > 0.0:
 		return
+	# 挨打会打断骇入连接
+	if hack_target != null:
+		_cancel_hack("遭受攻击")
 	if ghost_form:
 		# 相位态只受能量伤害
 		run.ge = maxf(0.0, run.ge - 6.0)
@@ -753,6 +870,13 @@ func _update_interactable() -> void:
 
 
 func _try_interact() -> void:
+	# 幽灵形态下 E 不再「使用东西」，而是「骇进去」：没在骇就起手，正在骇就主动断开
+	if ghost_form:
+		if hack_target != null:
+			_cancel_hack("主动断开")
+		else:
+			_begin_hack()
+		return
 	if _nearby_interactable != null and is_instance_valid(_nearby_interactable):
 		_nearby_interactable.interact(self)
 
@@ -866,6 +990,16 @@ func _draw() -> void:
 	if charging and charge_t >= CHARGE_TIME:
 		var p := 0.5 + 0.5 * sin(t * 18.0)
 		draw_arc(Vector2(0, -26), 26.0, 0.0, TAU, 24, Color(UITheme.AMBER.r, UITheme.AMBER.g, UITheme.AMBER.b, 0.20 + 0.25 * p), 2.0)
+
+	# 骇入连接线 + 进度环（画在自身局部坐标里，用 to_local 换算目标位置）
+	if hack_target != null and is_instance_valid(hack_target):
+		var origin := Vector2(0.0, -26.0)
+		var lp := to_local(hack_target.global_position + Vector2(0.0, -18.0))
+		var hack_pulse := 0.5 + 0.5 * sin(t * 22.0)
+		draw_line(origin, lp, Color(UITheme.CYAN.r, UITheme.CYAN.g, UITheme.CYAN.b, 0.30 + 0.45 * hack_pulse), 2.0)
+		var k: float = clampf(hack_t, 0.0, 1.0)
+		draw_arc(origin, 17.0, -PI * 0.5, -PI * 0.5 + TAU * k, 28, UITheme.CYAN, 2.6)
+		draw_arc(origin, 17.0, 0.0, TAU, 28, Color(UITheme.CYAN.r, UITheme.CYAN.g, UITheme.CYAN.b, 0.18), 1.0)
 
 
 func _sword_angle() -> float:
