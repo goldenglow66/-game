@@ -1,25 +1,29 @@
-# Godot 4.2+ specific ignores
-~*.dll
-
-# Godot 4+ specific ignores
+# ---------------- Godot 4 ----------------
+# 编辑器缓存与导入产物：可由 `--import` 或打开编辑器自动重建，不要提交
 .godot/
-.nomedia
-
-# Godot-specific ignores
 .import/
+
+# 导出预设常含本机绝对路径
+export_presets.cfg
 export.cfg
-export_credentials.cfg
-*.tmp
 
-# Imported translations (automatically generated from CSV files)
-*.translation
+# 导出产物
+build/
+*.pck
+*.zip
 
-# Mono-specific ignores
+# C# / Mono（本工程是纯 GDScript，留着以防将来接 C#）
 .mono/
 data_*/
 mono_crash.*.json
 
-# Export outputs
-*.exe
-# Uncomment if your project does not version PCK files as runtime dependencies.
-# *.pck
+# ---------------- 系统杂项 ----------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+
+# ---------------- 调试产出 ----------------
+# `-- --shot` 截图模式默认写到工程外的 _shots/，若被改到工程内则忽略
+_shots/
