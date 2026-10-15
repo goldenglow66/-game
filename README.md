@@ -39,6 +39,7 @@ $proj  = "C:\Users\Lenovo\Desktop\gamemake\cage-shadow"
 | L / 鼠标中键 | 铳 |
 | Tab | 切换铳械模块 |
 | I | 幽灵形态 |
+| I 形态下点 J | 骇入最近的敌人（按住不放，直到进度条走完） |
 | Q | 探测回波（幽灵体必须被标记才能打出伤害） |
 | E | 交互 |
 | Esc | 关面板 / 暂停 |
@@ -59,6 +60,9 @@ $p = "C:\Users\Lenovo\Desktop\gamemake\cage-shadow"
 & $g --headless --path $p --quit-after 9000 -- --bosscheck     # 具名 Boss → 击杀 → 解锁铳械模块 → 下潜 → 第三层胜利结算
 & $g --headless --path $p --quit-after 3600 -- --elementcheck  # 六种模块切换 + 五类克制倍率 + 弹道是否带着 element 字段
 & $g --headless --path $p --quit-after 3600 -- --servicecheck  # 局内售货机 / 维修节点的实体与面板
+& $g --headless --path $p --quit-after 3600 -- --pausecheck    # 暂停菜单：确认世界真的停住
+& $g --headless --path $p --quit-after 5400 -- --hackcheck     # 幽灵骇入：抗性表、瘫痪、三条中断路径
+& $g --headless --path $p --quit-after 5400 -- --eventcheck    # 事件房：面板、四种效果分支、余额不足禁用
 ```
 
 截图模式要真渲染（不能用 `--headless`）：
@@ -76,7 +80,7 @@ cage-shadow/
 ├─ scenes/Main.tscn       唯一场景，其余节点全部代码构建
 ├─ scripts/
 │  ├─ core/               事件总线、输入映射、元进度与存档、局内状态、音效合成、主状态机与自检
-│  ├─ data/               局内词条库 + 六种铳械模块
+│  ├─ data/               局内词条库 + 六种铳械模块 + 事件房奇遇库
 │  ├─ enemies/            敌人档案（含具名 Boss）与敌人实体
 │  ├─ fx/                 轻量特效：残影 / 火花 / 伤害数字 / 光环 / 浮动文字
 │  ├─ ui/                 全息 UI 主题、HUD 与各面板、数据舱三选一
