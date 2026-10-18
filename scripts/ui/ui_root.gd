@@ -8,7 +8,7 @@ extends CanvasLayer
 enum Mode { NONE, TITLE, HUB, RUN, GAMEOVER }
 
 const TITLE_SCENE := preload("res://ui/scenes/title.tscn")
-const PAUSE_SCENE := preload("res://ui/scenes/pause.tscn")
+const PAUSE_SCENE := preload("res://ui/scenes/pause_menu.tscn")
 
 const PANEL_W := 880.0
 const PANEL_H := 540.0
@@ -1209,8 +1209,8 @@ func set_paused(v: bool) -> void:
 	get_tree().paused = v
 	if v:
 		Sfx.play("ui_confirm", -6.0)
+		# 焦点交给暂停容器自己 —— 它要让箭头先获得焦点，而不是设置面板里的隐藏按钮。
 		_rebuild_pause()
-		_focus_first_button()
 	else:
 		_release_ui_focus()
 

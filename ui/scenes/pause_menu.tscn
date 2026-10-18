@@ -1,0 +1,115 @@
+[gd_scene format=3 uid="uid://djy8mcspiu8kn"]
+
+[ext_resource type="Script" uid="uid://c0v0y70tubmj5" path="res://ui/scripts/pause_menu.gd" id="1_4igug"]
+[ext_resource type="PackedScene" uid="uid://d13wl5io6iu1u" path="res://ui/scenes/pause_equip.tscn" id="2_c1v2k"]
+[ext_resource type="PackedScene" uid="uid://derc484k6d0o7" path="res://ui/scenes/pause.tscn" id="3_2rs31"]
+
+[node name="PauseMenu" type="Control" unique_id=2060505446]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_4igug")
+
+[node name="Dim" type="ColorRect" parent="." unique_id=2146675773]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.019607844, 0.03137255, 0.047058824, 0.92)
+
+[node name="EquipPage" parent="." unique_id=1815213359 instance=ExtResource("2_c1v2k")]
+layout_mode = 0
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+
+[node name="CorePage" parent="." unique_id=1835169278 instance=ExtResource("3_2rs31")]
+layout_mode = 1
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Controls" type="Control" parent="." unique_id=211612499]
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="ArrowLeft" type="Button" parent="Controls" unique_id=2130420990]
+layout_mode = 0
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -15.5
+offset_right = 14.0
+offset_bottom = 15.5
+text = "‹"
+
+[node name="ArrowRight" type="Button" parent="Controls" unique_id=1016806337]
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -14.0
+offset_top = -15.5
+offset_bottom = 15.5
+text = "›"
+
+[node name="Dots" type="HBoxContainer" parent="Controls" unique_id=1969013228]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+theme_override_constants/separation = 10
+
+[node name="Dot0" type="Label" parent="Controls/Dots" unique_id=1035333143]
+layout_mode = 2
+text = "●"
+
+[node name="Dot1" type="Label" parent="Controls/Dots" unique_id=628881258]
+layout_mode = 2
+text = "●"
+
+[node name="StatusLine" type="Label" parent="Controls" unique_id=977107314]
+layout_mode = 0
+offset_right = 1.0
+offset_bottom = 23.0
+
+[node name="MenuBar" type="HBoxContainer" parent="Controls" unique_id=416673926]
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = -132.0
+offset_right = -40.0
+offset_bottom = -76.0
+theme_override_constants/separation = 12
+
+[node name="BtnResume" type="Button" parent="Controls/MenuBar" unique_id=966090980]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "继 续 游 戏"
+
+[node name="BtnAbandon" type="Button" parent="Controls/MenuBar" unique_id=463472403]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "放 弃 本 局"
+
+[node name="BtnSettings" type="Button" parent="Controls/MenuBar" unique_id=560299366]
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "游 戏 设 置"
+
+[node name="BtnSave" type="Button" parent="Controls/MenuBar" unique_id=822521837]
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "保 存 游 戏"
+
+[node name="BtnQuit" type="Button" parent="Controls/MenuBar" unique_id=1408023146]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "返 回 标 题"

@@ -1,23 +1,15 @@
-class_name UIPauseScreen
+class_name UIPauseCorePage
 extends Control
-## 暂停界面：左栏是当前装备的核心与效果，右栏是背包里拥有的核心（可滚动）。
+## 暂停一级界面的「核心页」：左栏核心样式（三个圆形槽位占位 + 效果），右栏背包列表。
 ##
-## 独立场景：可在编辑器里单独打开 `ui/scenes/pause.tscn` 编辑布局，
-## 也可 F6 运行 `ui/scenes/preview/pause_preview.tscn` 用假数据预览。
+## 这一页只负责显示 —— 翻页、退出、设置面板都由上层
+## `ui/scenes/pause_menu.tscn`（UIPauseMenu）处理，本脚本不发动作也不读存档。
 ##
-## 本脚本不引用 Game / Sfx / RunState —— 按钮只发 `action(id)` 信号，
-## 由宿主（ui_root.gd 或预览脚本）决定这几个 id 该干什么。
+## 独立预览：F6 运行 `ui/scenes/preview/pause_preview.tscn`。
 ##
 ## 核心系统尚未实现（见设定文档第 6 章「核心系统」），
 ## 左栏此刻是三个圆形凹槽的空占位；数据层补齐后填 set_effect_text / set_bag_empty_text。
 
-signal action(id: String)
-signal hover(id: String)
-
-const BTN_IDS: Array[String] = ["resume", "abandon_run", "goto_title"]
-
-@onready var _status: Label = $BottomBar/Status
-@onready var _abandon: Button = $BottomBar/Buttons/BtnAbandon
 @onready var _slot_row: HBoxContainer = $LeftCard/LeftMargin/LeftVBox/SlotArea/SlotFrame/SlotCenter/SlotRow
 @onready var _effect_text: Label = $LeftCard/LeftMargin/LeftVBox/EffectCard/EffectMargin/EffectVBox/EffectText
 @onready var _bag_empty: Label = $RightPanel/RightMargin/RightVBox/BagScroll/BagList/BagEmpty
@@ -26,21 +18,6 @@ const BTN_IDS: Array[String] = ["resume", "abandon_run", "goto_title"]
 func _ready() -> void:
 	_dress()
 	_apply_fonts()
-	_wire($BottomBar/Buttons/BtnResume, "resume", UITheme.CYAN)
-	_wire($BottomBar/Buttons/BtnAbandon, "abandon_run", UITheme.AMBER)
-	_wire($BottomBar/Buttons/BtnTitle, "goto_title", UITheme.PANEL_LINE)
-
-
-## 宿主在打开暂停界面之前调用。
-## is_run 为 false（据点）时隐藏「放弃本局」，状态行换成据点提示。
-func setup(is_run: bool, status_text: String) -> void:
-	_abandon.visible = is_run
-	_status.text = status_text
-
-
-## 聚焦第一个可用按钮（键盘可达）。
-func focus_first() -> void:
-	$BottomBar/Buttons/BtnResume.grab_focus()
 
 
 ## 核心数据层补齐后，用这两个接口填文案（布局不用动）。
@@ -53,7 +30,6 @@ func set_bag_empty_text(text: String) -> void:
 
 
 func _dress() -> void:
-	$Dim.color = Color(0.02, 0.03, 0.05, 0.76)
 	$LeftCard.add_theme_stylebox_override("panel", _card(Color("12141cf2"), UITheme.PANEL_LINE, 18))
 	$RightPanel.add_theme_stylebox_override("panel", _card(Color("12141cf2"), UITheme.PANEL_LINE, 2))
 	$LeftCard/LeftMargin/LeftVBox/EffectCard.add_theme_stylebox_override(
@@ -72,8 +48,6 @@ func _dress() -> void:
 	_set_label(right.get_node("RightHead/RightTitle"), 18, UITheme.TEXT_BRIGHT)
 	right.get_node("RightDivider").color = UITheme.PANEL_LINE
 	_set_label(_bag_empty, 15, UITheme.TEXT_DIM)
-
-	_set_label(_status, 14, UITheme.TEXT_DIM)
 
 
 ## 左栏三个圆形凹槽：第一个可装备（青色细边框），后两个锁定（暗边框）。
@@ -99,14 +73,6 @@ func _apply_fonts() -> void:
 	var f := UITheme.get_font()
 	for n in find_children("*", "Label", true, false):
 		(n as Label).add_theme_font_override("font", f)
-
-
-func _wire(b: Button, id: String, accent: Color) -> void:
-	UITheme.style_button(b, accent)
-	b.custom_minimum_size = Vector2(128, 38)
-	b.pressed.connect(func() -> void: action.emit(id))
-	b.mouse_entered.connect(func() -> void: hover.emit(id))
-	b.focus_entered.connect(func() -> void: hover.emit(id))
 
 
 func _set_label(l: Label, size: int, color: Color) -> void:

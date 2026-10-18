@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://ui/scripts/pause_preview.gd" id="1_prev"]
-[ext_resource type="PackedScene" path="res://ui/scenes/pause.tscn" id="2_pause"]
+[ext_resource type="PackedScene" path="res://ui/scenes/pause.tscn" id="2_page"]
 
 [node name="PausePreview" type="Control"]
 layout_mode = 3
@@ -17,4 +17,4 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 color = Color(0.0392157, 0.0431373, 0.0627451, 1)
 
-[node name="PauseLayer" parent="." instance=ExtResource("2_pause")]
+[node name="CorePage" parent="." instance=ExtResource("2_page")]

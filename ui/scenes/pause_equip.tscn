@@ -1,0 +1,113 @@
+[gd_scene format=3 uid="uid://d13wl5io6iu1u"]
+
+[ext_resource type="Script" uid="uid://c2flx4q583ij0" path="res://ui/scripts/equip_page.gd" id="1_chana"]
+
+[node name="EquipPage" type="Control" unique_id=1815213359]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_chana")
+
+[node name="PageMargin" type="MarginContainer" parent="." unique_id=310970139]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 56
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 148
+
+[node name="PageVBox" type="VBoxContainer" parent="PageMargin" unique_id=1847228418]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Row1" type="HBoxContainer" parent="PageMargin/PageVBox" unique_id=1072515051]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+
+[node name="CellSword" type="PanelContainer" parent="PageMargin/PageVBox/Row1" unique_id=560978227]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="SwordTitle" type="Label" parent="PageMargin/PageVBox/Row1/CellSword" unique_id=1784486251]
+layout_mode = 2
+text = "当前剑"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CellBow" type="PanelContainer" parent="PageMargin/PageVBox/Row1" unique_id=1801770757]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BowTitle" type="Label" parent="PageMargin/PageVBox/Row1/CellBow" unique_id=1185171855]
+layout_mode = 2
+text = "当前弓"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CellBuff" type="PanelContainer" parent="PageMargin/PageVBox/Row1" unique_id=1385050076]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BuffTitle" type="Label" parent="PageMargin/PageVBox/Row1/CellBuff" unique_id=1390853656]
+layout_mode = 2
+text = "当前buff"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Row2" type="HBoxContainer" parent="PageMargin/PageVBox" unique_id=1891839122]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+
+[node name="CellShield" type="PanelContainer" parent="PageMargin/PageVBox/Row2" unique_id=1490534248]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ShieldTitle" type="Label" parent="PageMargin/PageVBox/Row2/CellShield" unique_id=1117469356]
+layout_mode = 2
+text = "当前盾"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CellCore" type="PanelContainer" parent="PageMargin/PageVBox/Row2" unique_id=1861228487]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="CoreTitle" type="Label" parent="PageMargin/PageVBox/Row2/CellCore" unique_id=460773355]
+layout_mode = 2
+text = "当前核心效果"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CellElements" type="PanelContainer" parent="PageMargin/PageVBox/Row2" unique_id=1668401318]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ElemMargin" type="MarginContainer" parent="PageMargin/PageVBox/Row2/CellElements" unique_id=31446974]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 14
+
+[node name="ElemVBox" type="VBoxContainer" parent="PageMargin/PageVBox/Row2/CellElements/ElemMargin" unique_id=362359150]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ElemTitle" type="Label" parent="PageMargin/PageVBox/Row2/CellElements/ElemMargin/ElemVBox" unique_id=1693496795]
+layout_mode = 2
+text = "元素克制"
+
+[node name="ElemList" type="VBoxContainer" parent="PageMargin/PageVBox/Row2/CellElements/ElemMargin/ElemVBox" unique_id=1709665098]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
