@@ -33,3 +33,6 @@ _shots/
 # 该插件会往 project.godot 写入 [editor_plugins] 段和 _mcp_game_helper autoload，
 # 仓库里的 project.godot 保持干净版本（不含这两处）。
 addons/
+
+# 运行期存档（自动保存 / 脏备份），不入库
+userdata/
