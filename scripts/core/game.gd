@@ -9,6 +9,11 @@ enum Difficulty { ASSIST, NORMAL, HARD, OFFLINE }
 const SAVE_PATH := "user://cage_save.json"
 const SAVE_VERSION := 1
 
+## 自检 / 截图模式专用的沙盒存档。
+## 无头自检会真跑 start_run → end_run 的完整结算流程，若与玩家共用 SAVE_PATH，
+## 跑一次 `--bosscheck` 就会把碎片、胜场、出击次数直接写进玩家进度里。
+const SAVE_PATH_SANDBOX := "user://cage_save_selfcheck.json"
+
 ## 据点永久升级（消耗织网碎片）。数值刻意保守，避免永久成长压过局内构筑。
 const META_UPGRADES := {
 	"shell_hp":         {"name": "外壳扩容", "desc": "最大耐久 +10", "max": 10, "cost_base": 60, "cost_step": 45, "icon": "shell"},
@@ -47,11 +52,28 @@ var main: Node = null                     # Main 场景根节点引用（由 Mai
 var _hitstop_end_ms: int = 0
 var _pending_seed: int = 0
 
+## 本次运行实际读写的存档路径。自检模式会切到 SAVE_PATH_SANDBOX。
+var save_path: String = SAVE_PATH
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	InputActions.register_all()
+	if is_autotest_run():
+		save_path = SAVE_PATH_SANDBOX
+		print("[Game] 自检模式：存档切到 %s（玩家存档 %s 不动）" % [save_path, SAVE_PATH])
 	load_meta()
+
+
+## 当前是否是自检 / 截图运行。
+## 这些运行会走完整的开局 → 结算流程，必须和玩家存档隔离。
+## 自检参数写在 `--` 之后，全部以 check 结尾（截图用的 --shot 是唯一例外）。
+static func is_autotest_run() -> bool:
+	for a in OS.get_cmdline_user_args():
+		var s := str(a)
+		if s.ends_with("check") or s == "--shot":
+			return true
+	return false
 
 
 # ================= 存档 =================
@@ -61,9 +83,9 @@ func load_meta() -> void:
 	for key in META_UPGRADES.keys():
 		meta_upgrades[key] = 0
 
-	if not FileAccess.file_exists(SAVE_PATH):
+	if not FileAccess.file_exists(save_path):
 		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var f := FileAccess.open(save_path, FileAccess.READ)
 	if f == null:
 		return
 	var text := f.get_as_text()
@@ -103,9 +125,9 @@ func save_meta() -> void:
 		"stats": stats,
 		"intel_seen": intel_seen,
 	}
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f == null:
-		push_warning("无法写入存档：%s" % SAVE_PATH)
+		push_warning("无法写入存档：%s" % save_path)
 		return
 	f.store_string(JSON.stringify(data, "\t"))
 	f.close()

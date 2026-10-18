@@ -45,6 +45,8 @@ $proj  = "C:\Users\Lenovo\Desktop\gamemake\cage-shadow"
 | Esc | 关面板 / 暂停 |
 | F3 | 调试叠加层 |
 
+**界面导航**：任何带按钮的界面（标题页 / 据点面板 / 局内服务 / 三选一 / 暂停菜单 / 结算页）打开时会自动选中第一个按钮，用 **W / S**（或 ↑ / ↓）上下移动，**Enter / 空格**确认，**Esc** 返回上一层。鼠标操作不受影响。
+
 ## 自检入口
 
 工程内置一批无头自检，参数走 `OS.get_cmdline_user_args()`，所以要写在 `--` 之后。
@@ -64,6 +66,11 @@ $p = "C:\Users\Lenovo\Desktop\gamemake\cage-shadow"
 & $g --headless --path $p --quit-after 5400 -- --hackcheck     # 幽灵骇入：抗性表、瘫痪、三条中断路径
 & $g --headless --path $p --quit-after 5400 -- --eventcheck    # 事件房：面板、四种效果分支、余额不足禁用
 ```
+
+> **自检不会碰你的存档。** 带 `--selfcheck` / `--combatcheck` / … / `--eventcheck` / `--shot`
+> 运行时，存档路径会自动切到 `user://cage_save_selfcheck.json`（见 `scripts/core/game.gd`
+> 的 `SAVE_PATH_SANDBOX`），正式游玩的 `cage_save.json` 原样不动。
+> 这两者最初是共用一个文件的，跑一次 `--bosscheck` 就会把碎片、胜场和出击次数写进玩家进度。
 
 截图模式要真渲染（不能用 `--headless`）：
 

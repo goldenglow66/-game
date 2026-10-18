@@ -319,6 +319,7 @@ func show_title() -> void:
 			int(Game.stats.get("best_floor", 0)),
 			Game.shards_bank,
 		]
+	_focus_first_button()
 
 
 func show_hub() -> void:
@@ -327,6 +328,7 @@ func show_hub() -> void:
 	title_layer.visible = false
 	gameover_layer.visible = false
 	hud.visible = true
+	_release_ui_focus()
 
 
 func show_hud() -> void:
@@ -335,6 +337,7 @@ func show_hud() -> void:
 	title_layer.visible = false
 	gameover_layer.visible = false
 	hud.visible = true
+	_release_ui_focus()
 
 
 func show_gameover(victory: bool, banked: int) -> void:
@@ -350,6 +353,8 @@ func show_gameover(victory: bool, banked: int) -> void:
 	gameover_body.add_child(_center_label("带回织网碎片   %d" % banked, 22, UITheme.GOLD))
 	gameover_body.add_child(_center_label("本次下潜   %d 扇区" % (int(Game.stats.get("best_floor", 1))), 17, UITheme.TEXT_DIM))
 	gameover_body.add_child(_center_label("累计出击   %d 次" % int(Game.stats.get("runs", 0)), 17, UITheme.TEXT_DIM))
+	_release_ui_focus()
+	_focus_first_button()
 
 
 func _center_label(text: String, size: int, color: Color) -> Label:
@@ -402,6 +407,7 @@ func close_panel() -> void:
 	panel_layer.visible = false
 	Sfx.play("ui_cancel")
 	_set_player_controls(true)
+	_release_ui_focus()
 	Events.hub_panel_closed.emit(panel_kind)
 	panel_kind = ""
 
@@ -429,6 +435,7 @@ func _rebuild_panel() -> void:
 		"rest_node": _build_rest_node()
 		"event_node": _build_event_node()
 		_: _build_unknown()
+	_focus_first_button()
 
 
 # ---------- 事件房：未登记信号源 ----------
@@ -938,20 +945,98 @@ func _stat_line(name_: String, value: String, color: Color) -> HBoxContainer:
 func _mk_button(text: String, accent: Color, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
+	# 键盘可达：原来写死 FOCUS_NONE，鼠标能用但键盘完全进不来
+	b.focus_mode = Control.FOCUS_ALL
 	b.add_theme_font_override("font", UITheme.get_font())
 	b.add_theme_font_size_override("font_size", 15)
 	b.add_theme_stylebox_override("normal", UITheme.accent_style(accent.darkened(0.45), Color(0.06, 0.07, 0.10, 0.92)))
 	b.add_theme_stylebox_override("hover", UITheme.accent_style(accent, Color(0.10, 0.12, 0.16, 0.96)))
 	b.add_theme_stylebox_override("pressed", UITheme.accent_style(accent.darkened(0.2), Color(0.05, 0.06, 0.09, 0.98)))
 	b.add_theme_stylebox_override("disabled", UITheme.accent_style(Color("343b47"), Color(0.05, 0.05, 0.07, 0.85)))
+	# 焦点框用白色加粗，跟按钮自己的 accent 色区分开，键盘走到哪一眼能看见
+	var focus_box := UITheme.accent_style(Color.WHITE, Color(0.18, 0.21, 0.28, 0.98))
+	focus_box.set_border_width_all(2)
+	b.add_theme_stylebox_override("focus", focus_box)
 	b.add_theme_color_override("font_color", UITheme.TEXT_BRIGHT)
 	b.add_theme_color_override("font_hover_color", Color.WHITE)
+	b.add_theme_color_override("font_focus_color", Color.WHITE)
 	b.add_theme_color_override("font_disabled_color", Color("5d6673"))
 	if cb.is_valid():
 		b.pressed.connect(cb)
 	b.mouse_entered.connect(func(): Sfx.play("ui_move", -8.0))
 	return b
+
+
+# ================= 键盘可达 =================
+# 所有 UI 层打开时聚焦第一个按钮，W/S 在按钮之间环形移动。
+# 确认键不用这里管：Button 在 _gui_input 阶段就会消费内置的 ui_accept（Enter / Space）。
+
+## 收集一个节点子树里所有能聚焦的按钮，按视觉位置（先 y 后 x）排序。
+func _buttons_in(node: Node) -> Array[Button]:
+	var out: Array[Button] = []
+	if node == null or not is_instance_valid(node):
+		return out
+	for c in node.find_children("*", "Button", true, false):
+		var b := c as Button
+		if b != null and b.visible and not b.disabled:
+			out.append(b)
+	out.sort_custom(func(a: Button, b: Button) -> bool:
+		var pa := a.get_global_rect().position
+		var pb := b.get_global_rect().position
+		if absf(pa.y - pb.y) > 6.0:
+			return pa.y < pb.y
+		return pa.x < pb.x)
+	return out
+
+
+## 当前该接收键盘的 UI 层。null 表示此刻没有键盘可达的 UI（游戏中）。
+func _active_ui_layer() -> Control:
+	if pause_layer != null and pause_layer.visible:
+		return pause_layer
+	if panel_layer != null and panel_open and panel_layer.visible:
+		return panel_layer
+	if gameover_layer != null and gameover_layer.visible:
+		return gameover_layer
+	if title_layer != null and title_layer.visible:
+		return title_layer
+	return null
+
+
+## 聚焦当前层的第一个按钮。延迟一帧，等容器把子节点的位置算出来。
+func _focus_first_button() -> void:
+	await get_tree().process_frame
+	var layer := _active_ui_layer()
+	if layer == null:
+		return
+	var list := _buttons_in(layer)
+	if not list.is_empty():
+		list[0].grab_focus()
+
+
+## W/S 移动焦点。返回 true 表示这次输入被 UI 吃掉了。
+func _move_focus(dir: int) -> bool:
+	var layer := _active_ui_layer()
+	if layer == null:
+		return false
+	var list := _buttons_in(layer)
+	if list.is_empty():
+		return false
+	var cur := get_viewport().gui_get_focus_owner() as Button
+	var idx := list.find(cur)
+	var next := 0
+	if idx >= 0:
+		next = (idx + dir + list.size()) % list.size()
+	elif dir < 0:
+		next = list.size() - 1
+	list[next].grab_focus()
+	return true
+
+
+## 收起 UI 时把焦点还回去，免得隐藏的按钮继续吃 Enter / Space。
+func _release_ui_focus() -> void:
+	var vp := get_viewport()
+	if vp != null and vp.gui_get_focus_owner() != null:
+		vp.gui_release_focus()
 
 
 # ================= 数据舱三选一 =================
@@ -970,6 +1055,8 @@ func _on_reward_choices(choices: Array) -> void:
 	# 三选一期间冻结战斗：房间已经空了，但玩家不该在选卡时被打断，也不该趁机走掉
 	_set_player_controls(false)
 	get_tree().paused = true
+	# 三选一自己用 _unhandled_input 收键，必须先放开焦点，否则 Enter 会被旧按钮吃掉
+	_release_ui_focus()
 	reward.open(choices, Game.run)
 
 
@@ -1102,6 +1189,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	# W/S 移动焦点。放在 `if paused` 之前，暂停菜单也要吃这套。
+	# 没有可见 UI 层时 _move_focus 返回 false，不消费输入，玩家移动不受影响。
+	if event.is_action_pressed("move_up") and _move_focus(-1):
+		Sfx.play("ui_move", -8.0)
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("move_down") and _move_focus(1):
+		Sfx.play("ui_move", -8.0)
+		get_viewport().set_input_as_handled()
+		return
+
 	if paused:
 		return
 
@@ -1165,6 +1263,9 @@ func set_paused(v: bool) -> void:
 	if v:
 		Sfx.play("ui_confirm", -6.0)
 		_rebuild_pause()
+		_focus_first_button()
+	else:
+		_release_ui_focus()
 
 
 func _rebuild_pause() -> void:
