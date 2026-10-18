@@ -2,9 +2,13 @@ class_name UIRoot
 extends CanvasLayer
 ## 全局 UI：标题 / 据点 HUD / 局内 HUD / 结算，以及据点面板（长椅、改造台、黑市、终端、出击）。
 ##
-## 全部走代码构建（无 .tscn），便于 diff 与 headless 校验。
+## 大部分仍走代码构建（便于 diff 与 headless 校验）；标题页已迁移到
+## `ui/scenes/title.tscn`，由 `ui/scripts/title.gd` 驱动，可单独预览。
 
 enum Mode { NONE, TITLE, HUB, RUN, GAMEOVER }
+
+const TITLE_SCENE := preload("res://ui/scenes/title.tscn")
+const PAUSE_SCENE := preload("res://ui/scenes/pause.tscn")
 
 const PANEL_W := 880.0
 const PANEL_H := 540.0
@@ -42,7 +46,6 @@ var _boss: Node = null
 
 var paused: bool = false
 var pause_layer: Control
-var pause_box: VBoxContainer
 
 var _t: float = 0.0
 
@@ -196,71 +199,28 @@ func _build_panel() -> void:
 
 
 func _build_title() -> void:
-	title_layer = Control.new()
+	var t: Control = TITLE_SCENE.instantiate()
+	title_layer = t
 	title_layer.name = "TitleLayer"
-	title_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	title_layer.visible = false
 	root.add_child(title_layer)
+	# 标题页只发信号：进安全屋 / 出击 / 清档在这里翻译成动作。
+	# 场景本身不认识 Game / Sfx / Events，可以脱离游戏单独预览。
+	title_layer.connect("action", _on_title_action)
+	title_layer.connect("hover", func(_id: String) -> void: Sfx.play("ui_move", -8.0))
 
-	var col := VBoxContainer.new()
-	col.set_anchors_preset(Control.PRESET_CENTER_LEFT)
-	col.offset_left = 118.0
-	col.offset_top = -212.0
-	col.offset_right = 700.0
-	col.offset_bottom = 240.0
-	col.add_theme_constant_override("separation", 6)
-	title_layer.add_child(col)
 
-	col.add_child(UITheme.label("笼 中 墟 影", 76, UITheme.TEXT_BRIGHT))
-	col.add_child(UITheme.label("GHOST  IN  THE  IRON  SHELL", 20, UITheme.CYAN))
-	col.add_child(UITheme.spacer(8))
-	col.add_child(UITheme.label("科幻 · 横板动作 · 肉鸽", 18, UITheme.TEXT_DIM))
-	col.add_child(UITheme.spacer(26))
-
-	var btn_col := VBoxContainer.new()
-	btn_col.add_theme_constant_override("separation", 9)
-	col.add_child(btn_col)
-
-	var b_hub := _mk_button("进 入 安 全 屋", UITheme.CYAN, func():
-		Sfx.play("ui_confirm")
-		goto_screen("goto_hub")
-	)
-	b_hub.custom_minimum_size = Vector2(268, 42)
-	btn_col.add_child(b_hub)
-
-	var b_run := _mk_button("直 接 出 击（测试）", UITheme.RED, func():
-		Sfx.play("ui_confirm")
-		goto_screen("begin_run", randi())
-	)
-	b_run.custom_minimum_size = Vector2(268, 42)
-	btn_col.add_child(b_run)
-
-	var b_wipe := _mk_button("清 除 存 档", Color("5a6474"), func():
-		Game.reset_save()
-		Events.toast.emit("存档已清除", UITheme.RED)
-		Sfx.play("ui_deny")
-	)
-	b_wipe.custom_minimum_size = Vector2(268, 34)
-	btn_col.add_child(b_wipe)
-
-	# 右下角进度
-	var info := UITheme.label("", 15, UITheme.TEXT_DIM)
-	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	info.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	info.offset_left = -560.0
-	info.offset_right = -36.0
-	info.offset_top = -96.0
-	info.offset_bottom = -36.0
-	info.name = "TitleInfo"
-	title_layer.add_child(info)
-
-	var ver := UITheme.label("v0.1 · Godot 4.7 · 设定文档基准", 14, Color(0.45, 0.5, 0.58))
-	ver.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	ver.offset_left = 36.0
-	ver.offset_top = -46.0
-	ver.offset_right = 600.0
-	ver.offset_bottom = -22.0
-	title_layer.add_child(ver)
+func _on_title_action(id: String) -> void:
+	match id:
+		"goto_hub":
+			Sfx.play("ui_confirm")
+			goto_screen("goto_hub")
+		"begin_run":
+			Sfx.play("ui_confirm")
+			goto_screen("begin_run", randi())
+		"wipe_save":
+			Game.reset_save()
+			Events.toast.emit("存档已清除", UITheme.RED)
+			Sfx.play("ui_deny")
 
 
 func _build_gameover() -> void:
@@ -312,13 +272,11 @@ func show_title() -> void:
 	panel_open = false
 	hud.visible = false
 	interact_label.modulate.a = 0.0
-	var info := title_layer.get_node_or_null("TitleInfo")
-	if info != null:
-		info.text = "已出击 %d 次 · 最长下潜 %d 扇区 · 织网碎片 %d" % [
-			int(Game.stats.get("runs", 0)),
-			int(Game.stats.get("best_floor", 0)),
-			Game.shards_bank,
-		]
+	title_layer.call("set_info", "已出击 %d 次 · 最长下潜 %d 扇区 · 织网碎片 %d" % [
+		int(Game.stats.get("runs", 0)),
+		int(Game.stats.get("best_floor", 0)),
+		Game.shards_bank,
+	])
 	_focus_first_button()
 
 
@@ -1213,38 +1171,27 @@ func _unhandled_input(event: InputEvent) -> void:
 # ================= 暂停 =================
 
 func _build_pause() -> void:
-	pause_layer = Control.new()
+	var p: Control = PAUSE_SCENE.instantiate()
+	pause_layer = p
 	pause_layer.name = "PauseLayer"
-	pause_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	pause_layer.visible = false
 	root.add_child(pause_layer)
+	# 暂停页只发信号：「继续 / 放弃本局 / 返回标题」在这里翻译成动作。
+	pause_layer.connect("action", _on_pause_action)
+	pause_layer.connect("hover", func(_id: String) -> void: Sfx.play("ui_move", -8.0))
 
-	var dim := ColorRect.new()
-	dim.color = Color(0.02, 0.03, 0.05, 0.76)
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	pause_layer.add_child(dim)
 
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pause_layer.add_child(center)
-
-	var frame := PanelContainer.new()
-	frame.custom_minimum_size = Vector2(560, 0)
-	frame.add_theme_stylebox_override("panel", UITheme.panel_style(Color("10131bf7"), UITheme.PANEL_LINE, 5, 1))
-	center.add_child(frame)
-
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 30)
-	margin.add_theme_constant_override("margin_right", 30)
-	margin.add_theme_constant_override("margin_top", 22)
-	margin.add_theme_constant_override("margin_bottom", 22)
-	frame.add_child(margin)
-
-	pause_box = VBoxContainer.new()
-	pause_box.add_theme_constant_override("separation", 9)
-	margin.add_child(pause_box)
+func _on_pause_action(id: String) -> void:
+	match id:
+		"resume":
+			Sfx.play("ui_confirm")
+			set_paused(false)
+		"abandon_run":
+			Sfx.play("ui_confirm")
+			_pause_leave("goto_hub")
+		"goto_title":
+			Sfx.play("ui_confirm")
+			_pause_leave("goto_title")
 
 
 func toggle_pause() -> void:
@@ -1269,35 +1216,16 @@ func set_paused(v: bool) -> void:
 
 
 func _rebuild_pause() -> void:
-	if pause_box == null:
+	if pause_layer == null:
 		return
-	for c in pause_box.get_children():
-		pause_box.remove_child(c)
-		c.queue_free()
-
-	pause_box.add_child(UITheme.label("已暂停", 30, UITheme.TEXT_BRIGHT))
-	pause_box.add_child(UITheme.divider(UITheme.PANEL_LINE, 1))
-
 	var run := Game.run
 	if mode == Mode.RUN and run != null:
-		pause_box.add_child(UITheme.label(
-			"织网 · 第 %d 扇区    难度 %s    已清房间 %d" % [
-				run.floor_index + 1, Game.difficulty_name(), run.rooms_cleared
-			], 15, UITheme.TEXT_DIM))
-		pause_box.add_child(UITheme.label(
-			"本局碎片 %d · 盲区币 %d · 死亡会按难度比例带回" % [run.shards, run.coins],
-			15, UITheme.TEXT_DIM))
-		pause_box.add_child(UITheme.spacer(6))
-		pause_box.add_child(_mk_button("继续", UITheme.CYAN, func(): set_paused(false)))
-		pause_box.add_child(_mk_button("放弃本局，回安全屋", UITheme.AMBER, func(): _pause_leave("goto_hub")))
+		pause_layer.call("setup", true,
+			"已暂停 · 织网 第 %d 扇区 · 难度 %s · 已清房间 %d · 本局碎片 %d · 盲区币 %d" % [
+				run.floor_index + 1, Game.difficulty_name(), run.rooms_cleared, run.shards, run.coins
+			])
 	else:
-		pause_box.add_child(UITheme.label("这里是安全屋，不会丢东西。", 15, UITheme.TEXT_DIM))
-		pause_box.add_child(UITheme.spacer(6))
-		pause_box.add_child(_mk_button("继续", UITheme.CYAN, func(): set_paused(false)))
-
-	pause_box.add_child(_mk_button("返回标题", UITheme.PANEL_LINE, func(): _pause_leave("goto_title")))
-	pause_box.add_child(UITheme.spacer(4))
-	pause_box.add_child(UITheme.label("再按一次 Esc 继续", 13, UITheme.TEXT_DIM))
+		pause_layer.call("setup", false, "已暂停 · 这里是安全屋，不会丢东西。")
 
 
 func _pause_leave(method: String) -> void:

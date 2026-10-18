@@ -110,6 +110,25 @@ static func accent_style(accent: Color, bg: Color = Color(0.07, 0.08, 0.11, 0.95
 	return sb
 
 
+## 统一的菜单按钮外观（标题页 / 暂停页共用）。
+## 从 title.gd 的就地配置搬来，逐值一致，避免两个界面以后分叉。
+static func style_button(b: Button, accent: Color) -> void:
+	b.focus_mode = Control.FOCUS_ALL
+	b.add_theme_font_override("font", get_font())
+	b.add_theme_font_size_override("font_size", 15)
+	b.add_theme_stylebox_override("normal", accent_style(accent.darkened(0.45), Color(0.06, 0.07, 0.10, 0.92)))
+	b.add_theme_stylebox_override("hover", accent_style(accent, Color(0.10, 0.12, 0.16, 0.96)))
+	b.add_theme_stylebox_override("pressed", accent_style(accent.darkened(0.2), Color(0.05, 0.06, 0.09, 0.98)))
+	b.add_theme_stylebox_override("disabled", accent_style(Color("343b47"), Color(0.05, 0.05, 0.07, 0.85)))
+	var focus_box := accent_style(Color.WHITE, Color(0.18, 0.21, 0.28, 0.98))
+	focus_box.set_border_width_all(2)
+	b.add_theme_stylebox_override("focus", focus_box)
+	b.add_theme_color_override("font_color", TEXT_BRIGHT)
+	b.add_theme_color_override("font_hover_color", Color.WHITE)
+	b.add_theme_color_override("font_focus_color", Color.WHITE)
+	b.add_theme_color_override("font_disabled_color", Color("5d6673"))
+
+
 static func rarity_color(rarity: String) -> Color:
 	return RARITY.get(rarity, TEXT)
 

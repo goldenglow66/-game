@@ -1,0 +1,132 @@
+[gd_scene format=3 uid="uid://b5lbwb3wo3bix"]
+
+[ext_resource type="Script" uid="uid://e8hkntcq4j3x" path="res://ui/scripts/title.gd" id="1_6v464"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6v464"]
+bg_color = Color(0.070588, 0.078431, 0.109804, 0.94902)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.164706, 0.188235, 0.25098, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ny025"]
+bg_color = Color(0.05098, 0.058824, 0.086275, 0.901961)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.164706, 0.188235, 0.25098, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="TitleLayer" type="Control" unique_id=12383825]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_6v464")
+
+[node name="TitleInfo" type="Label" parent="." unique_id=1709595179]
+visible = false
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -560.0
+offset_top = -96.0
+offset_right = -36.0
+offset_bottom = -36.0
+theme_override_colors/font_color = Color(0.49019608, 0.53333336, 0.6, 1)
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 2
+
+[node name="Version" type="Label" parent="." unique_id=220025047]
+visible = false
+layout_mode = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 36.0
+offset_top = -46.0
+offset_right = 600.0
+offset_bottom = -22.0
+theme_override_colors/font_color = Color(0.49019608, 0.53333336, 0.6, 1)
+theme_override_font_sizes/font_size = 13
+text = "v0.1 · Godot 4.7 · 设定文档基准"
+
+[node name="TitleCard" type="PanelContainer" parent="." unique_id=1187209778]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 80.0
+offset_right = 500.0
+offset_bottom = 275.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_6v464")
+
+[node name="CardMargin" type="MarginContainer" parent="TitleCard" unique_id=324972718]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 22
+
+[node name="CardVBox" type="VBoxContainer" parent="TitleCard/CardMargin" unique_id=371092937]
+layout_mode = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="TitleMain" type="Label" parent="TitleCard/CardMargin/CardVBox" unique_id=511409016]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93333334, 0.9529412, 0.972549, 1)
+theme_override_font_sizes/font_size = 60
+text = "笼 中 墟 影"
+
+[node name="TitleSub" type="Label" parent="TitleCard/CardMargin/CardVBox" unique_id=679273452]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.30980393, 0.8392157, 0.78431374, 1)
+theme_override_font_sizes/font_size = 16
+text = "GHOST  IN  THE  IRON  SHELL"
+
+[node name="Tagline" type="Label" parent="TitleCard/CardMargin/CardVBox" unique_id=1147972881]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49019608, 0.53333336, 0.6, 1)
+theme_override_font_sizes/font_size = 15
+text = "科幻 · 横板动作 · 肉鸽"
+
+[node name="MenuPanel" type="PanelContainer" parent="." unique_id=2089332343]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 295.0
+offset_right = 500.0
+offset_bottom = 615.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_ny025")
+
+[node name="MenuMargin" type="MarginContainer" parent="MenuPanel" unique_id=382665684]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 22
+
+[node name="MenuVBox" type="VBoxContainer" parent="MenuPanel/MenuMargin" unique_id=296327332]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="BtnHub" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=980092452]
+layout_mode = 2
+text = "进 入 安 全 屋"
+
+[node name="BtnRun" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=1653824661]
+layout_mode = 2
+text = "直 接 出 击（测试）"
+
+[node name="BtnWipe" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=32982494]
+layout_mode = 2
+text = "清 除 存 档"
