@@ -27,6 +27,27 @@ $proj  = "C:\Users\Lenovo\Desktop\gamemake\cage-shadow"
 
 新增任何带 `class_name` 的脚本之后，也要重跑一次 `--import`。
 
+## 可选：godot-ai MCP 插件
+
+本仓库**不含** `addons/`。开发时用了 [godot-ai](https://github.com/hi-godot/godot-ai) 4.3.0
+（Godot 编辑器插件 + MCP 服务器），让 AI 客户端能读到编辑器状态、日志、场景树、性能面板。
+
+想复现这套环境：从 [Godot Asset Library 条目 5050](https://godotengine.org/asset-library/asset/5050)
+或该项目的 release 包安装到 `res://addons/godot_ai/`，然后在编辑器里启用插件。
+
+**注意**：插件启用后会自动往 `project.godot` 写入两处配置——
+
+```ini
+[autoload]
+_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
+
+[editor_plugins]
+enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
+```
+
+仓库里的 `project.godot` 是**不含这两处的干净版本**。本地启用插件后 `git status` 会显示
+`project.godot` 被修改——这是预期的，**不要把这两处提交上来**。
+
 ## 操作
 
 | 键 | 动作 |
