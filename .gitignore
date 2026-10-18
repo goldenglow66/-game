@@ -27,3 +27,9 @@ desktop.ini
 # ---------------- 调试产出 ----------------
 # `-- --shot` 截图模式默认写到工程外的 _shots/，若被改到工程内则忽略
 _shots/
+
+# ---------------- 第三方编辑器插件 ----------------
+# godot-ai MCP 插件只在本地开发时用，不入库。安装方式见 README「可选：godot-ai MCP 插件」。
+# 该插件会往 project.godot 写入 [editor_plugins] 段和 _mcp_game_helper autoload，
+# 仓库里的 project.godot 保持干净版本（不含这两处）。
+addons/
