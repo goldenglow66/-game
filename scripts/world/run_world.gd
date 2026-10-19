@@ -19,16 +19,96 @@ var _enemies_layer: Node2D = null
 var _active_enemies: Array = []
 var _boss_hint_ms: int = 0
 
+## 首帧构建期间不要自动存档，否则 _build_sector() 里的第一次 _enter_room
+## 会立刻把刚读出来的存档覆盖成「第一个房间」。
+var _ready_done: bool = false
+## 读档后第一次踏进这个房间是恢复本身造成的，跳过那一次自动存档。
+var _resume_room_index: int = -1
+
 
 func _ready() -> void:
+	Game.run_world = self
 	run = Game.run
 	if run == null:
 		run = Game.start_run(0)
 	_build_sector()
+	_apply_resume()
+	_ready_done = true
+	# 新开局立刻落一个自动记录点；续关（_resume_room_index >= 0）不动存档，
+	# 免得刚读出来的精确位置被房间入口覆盖。
+	if _resume_room_index < 0:
+		Game.save_run("auto")
 	Events.banner.emit("织网 · 第 %d 扇区" % (run.floor_index + 1), "%s — 表层接入点" % level.theme_name())
 	await get_tree().create_timer(2.2).timeout
 	if is_instance_valid(self):
 		Events.subtitle.emit("织网在你脚下呼吸。往右走，别停。", "卡斯特")
+
+
+func _exit_tree() -> void:
+	if Game.run_world == self:
+		Game.run_world = null
+
+
+## 读档续关。地图不用存 —— 它由 seed 决定，重建出来跟存档时一模一样。
+##
+## manual：回到保存时的精确坐标，并恢复房间 payload（商店/事件房保持原状）。
+## auto  ：回到保存时所在房间的入口，payload 全部丢掉 ——
+##         商店、休整房、事件信号源都会重新生成，等于「房间回到原始状态」。
+func _apply_resume() -> void:
+	if Game.resume_snapshot.is_empty() or level == null:
+		return
+
+	var snap := Game.resume_snapshot
+	Game.resume_snapshot = {}
+
+	var cleared = snap.get("cleared", [])
+	if typeof(cleared) == TYPE_ARRAY:
+		for item in cleared:
+			var idx := int(item)
+			for room in level.rooms:
+				if room.index == idx:
+					room.cleared = true
+					room.entered = true
+					break
+
+	var room_index := int(snap.get("room_index", 0))
+	var target: Room = null
+	for room in level.rooms:
+		if room.index == room_index:
+			target = room
+			break
+	if player == null:
+		return
+
+	var mode := str(snap.get("mode", "auto"))
+	if mode == "manual":
+		var payloads = snap.get("payloads", {})
+		if typeof(payloads) == TYPE_DICTIONARY:
+			for key in payloads.keys():
+				var idx := int(str(key))
+				for rm in level.rooms:
+					if rm.index != idx:
+						continue
+					var src = payloads[key]
+					if typeof(src) != TYPE_DICTIONARY:
+						break
+					# 整份拷出来再回写：直接从 JSON 反序列化得到的嵌套字典
+					# 就地改键容易踩到只读引用，复制一份最稳。
+					var merged: Dictionary = rm.payload.duplicate()
+					for k in src.keys():
+						merged[str(k)] = src[k]
+					rm.payload = merged
+					break
+		var pos = snap.get("pos", {})
+		if typeof(pos) == TYPE_DICTIONARY:
+			player.global_position = Vector2(float(pos.get("x", 0.0)), float(pos.get("y", 0.0)))
+			_resume_room_index = room_index
+			return
+
+	# auto：从房间入口开始
+	if target != null:
+		player.global_position = Vector2(target.x_start + 180.0, target.floor_y - 40.0)
+		_resume_room_index = target.index
 
 
 # ================= 构建 =================
@@ -117,6 +197,13 @@ func _enter_room(r: Room) -> void:
 			_populate_service_room(r)
 		elif r.kind == Room.Kind.EVENT:
 			_populate_event_room(r)
+
+	# 自动记录点：每踏进一个新房间静默写一次「房间入口」存档。
+	# 玩家直接关窗口时，这就是回退点。恢复本身触发的那一次要跳过。
+	if r.index == _resume_room_index:
+		_resume_room_index = -1
+	elif _ready_done:
+		Game.save_run("auto")
 
 
 ## 事件房：落地一个「未登记信号源」，玩家可以走过去接入，也可以当没看见

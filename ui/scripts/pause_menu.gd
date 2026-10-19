@@ -6,7 +6,7 @@ extends Control
 ## 本容器只负责翻页、页签圆点，以及底部那排菜单按钮。
 ##
 ## 底部菜单从左至右：继续游戏 / 放弃本局 / 游戏设置 / 保存游戏 / 返回标题。
-## 「放弃本局」只在局内显示；「游戏设置」「保存游戏」对应的系统还没做，暂时是灰的。
+## 「放弃本局」「保存游戏」只在局内可用；「游戏设置」对应的系统还没做，一直是灰的。
 ## 独立预览：F6 运行 `ui/scenes/preview/pause_menu_preview.tscn`。
 
 signal action(id: String)
@@ -33,6 +33,14 @@ const MENU_ITEMS := [
 @onready var _dots: HBoxContainer = $Controls/Dots
 @onready var _menu: HBoxContainer = $Controls/MenuBar
 @onready var _abandon: Button = $Controls/MenuBar/BtnAbandon
+@onready var _save: Button = $Controls/MenuBar/BtnSave
+
+@onready var _confirm: Control = $ConfirmLayer
+@onready var _confirm_panel: PanelContainer = $ConfirmLayer/ConfirmCenter/ConfirmPanel
+@onready var _confirm_title: Label = $ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmTitle
+@onready var _confirm_body: Label = $ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmBody
+@onready var _btn_confirm: Button = $ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmRow/BtnConfirm
+@onready var _btn_cancel: Button = $ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmRow/BtnCancel
 
 var page: int = PAGE_EQUIP
 
@@ -43,6 +51,7 @@ func _ready() -> void:
 	_core.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	_dress()
+	_dress_confirm()
 	_apply_fonts()
 
 	# Controls 是铺满全屏的浮层，默认 MOUSE_FILTER_STOP 会挡住下层页面的点击，
@@ -73,7 +82,10 @@ func _ready() -> void:
 ## is_run 为 false（据点）时隐藏「放弃本局」，状态行换成据点提示。
 func setup(is_run: bool, status_text: String) -> void:
 	_abandon.visible = is_run
+	# 只有局内才有东西可存；据点的元进度本来就是自动保存的。
+	_save.disabled = not is_run
 	_status.text = status_text
+	_confirm.visible = false
 	_show_page(PAGE_EQUIP)
 	focus_first()
 
@@ -104,18 +116,58 @@ func _wire_menu() -> void:
 		var b := _menu.get_node(item["node"]) as Button
 		UITheme.style_button(b, item["accent"])
 		b.custom_minimum_size = Vector2(0, b.size.y if b.size.y > 0.0 else 56.0)
-		if b.disabled:
-			continue
+		# 灰态按钮也接线：setup() 会按当前场景动态启用「保存游戏」。
 		var id: String = item["id"]
-		b.pressed.connect(func() -> void: action.emit(id))
+		b.pressed.connect(func() -> void: _on_menu(id))
 		b.mouse_entered.connect(func() -> void: hover.emit(id))
 		b.focus_entered.connect(func() -> void: hover.emit(id))
+
+
+## 菜单按钮统一入口。「放弃本局」要先过一次确认，其余直接往外发。
+func _on_menu(id: String) -> void:
+	if id == "abandon_run":
+		_show_confirm()
+		return
+	action.emit(id)
+
+
+func _show_confirm() -> void:
+	_confirm.visible = true
+	# 默认焦点放在「取消」上：误触两次 Enter 也不会丢本局。
+	_btn_cancel.grab_focus()
+
+
+func _hide_confirm() -> void:
+	_confirm.visible = false
+	_abandon.grab_focus()
+
+
+func _dress_confirm() -> void:
+	_confirm_panel.add_theme_stylebox_override("panel", UITheme.panel_style(Color("12141cf4"), UITheme.RED.darkened(0.35), 4, 1))
+	_set_label(_confirm_title, 22, UITheme.TEXT_BRIGHT)
+	_set_label(_confirm_body, 14, UITheme.TEXT_DIM)
+	_confirm_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.style_button(_btn_confirm, UITheme.RED)
+	UITheme.style_button(_btn_cancel, UITheme.CYAN)
+	for b in [_btn_confirm, _btn_cancel]:
+		(b as Button).add_theme_font_size_override("font_size", 15)
+	_btn_confirm.pressed.connect(func() -> void: action.emit("abandon_run"))
+	_btn_cancel.pressed.connect(func() -> void: _hide_confirm())
+	for b in [_btn_confirm, _btn_cancel]:
+		(b as Button).mouse_entered.connect(func() -> void: hover.emit("confirm"))
 
 
 ## 用 `_input` 而不是 `_unhandled_input`：焦点在 Button 上时，方向键会被 GUI
 ## 的焦点导航吃掉，根本到不了 `_unhandled_input`，翻页就永远失效。
 func _input(event: InputEvent) -> void:
 	if not visible:
+		return
+
+	# 确认弹窗开着的时候，左右键不翻页，Esc 只关弹窗不关暂停。
+	if _confirm.visible:
+		if event.is_action_pressed("cancel"):
+			_hide_confirm()
+			get_viewport().set_input_as_handled()
 		return
 
 	if event.is_action_pressed("move_left"):

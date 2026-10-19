@@ -9,6 +9,7 @@ enum Mode { NONE, TITLE, HUB, RUN, GAMEOVER }
 
 const TITLE_SCENE := preload("res://ui/scenes/title.tscn")
 const PAUSE_SCENE := preload("res://ui/scenes/pause_menu.tscn")
+const ARCHIVE_SCENE := preload("res://ui/scenes/archive.tscn")
 
 const PANEL_W := 880.0
 const PANEL_H := 540.0
@@ -31,6 +32,7 @@ var subtitle_timer: float = 0.0
 var toast_box: VBoxContainer
 
 var title_layer: Control
+var archive_layer: Control
 var gameover_layer: Control
 var gameover_title: Label
 var gameover_body: VBoxContainer
@@ -140,6 +142,7 @@ func _build() -> void:
 
 	_build_panel()
 	_build_title()
+	_build_archive()
 	_build_gameover()
 	_build_reward()
 	_build_pause()
@@ -211,6 +214,9 @@ func _build_title() -> void:
 
 func _on_title_action(id: String) -> void:
 	match id:
+		"resume_run":
+			Sfx.play("ui_confirm")
+			goto_screen("resume_run")
 		"goto_hub":
 			Sfx.play("ui_confirm")
 			goto_screen("goto_hub")
@@ -221,6 +227,97 @@ func _on_title_action(id: String) -> void:
 			Game.reset_save()
 			Events.toast.emit("存档已清除", UITheme.RED)
 			Sfx.play("ui_deny")
+		"open_archive":
+			Sfx.play("ui_confirm")
+			show_archive()
+
+
+# ================= 存档栏位 =================
+
+func _build_archive() -> void:
+	archive_layer = ARCHIVE_SCENE.instantiate()
+	archive_layer.name = "ArchiveLayer"
+	archive_layer.visible = false
+	root.add_child(archive_layer)
+	archive_layer.connect("action", _on_archive_action)
+	archive_layer.connect("slot_action", _on_archive_slot)
+	archive_layer.connect("hover", func(_id: String) -> void: Sfx.play("ui_move", -8.0))
+
+
+## 每个栏位一行：标题、摘要、是否有内容、能否存入。
+func _slot_rows() -> Array:
+	var rows: Array = []
+	var can_save := Game.has_run_save()
+	var tz_bias := int(Time.get_time_zone_from_system().get("bias", 0))
+	for i in Game.SLOT_COUNT:
+		var m := Game.slot_meta(i)
+		if m.is_empty():
+			rows.append({
+				"title": "空 栏 位",
+				"desc": "—",
+				"has_data": false,
+				"can_save": can_save,
+			})
+			continue
+		var dt := Time.get_datetime_dict_from_unix_time(int(m["saved_at"]) + tz_bias * 60)
+		rows.append({
+			"title": "织网 第 %d 扇区 · 房间 %d" % [int(m["floor"]) + 1, int(m["room"]) + 1],
+			"desc": "血量 %d/%d · 已清房间 %d · %04d-%02d-%02d %02d:%02d" % [
+				int(m["hp"]), int(m["max_hp"]), int(m["rooms_cleared"]),
+				int(dt.get("year", 0)), int(dt.get("month", 0)), int(dt.get("day", 0)),
+				int(dt.get("hour", 0)), int(dt.get("minute", 0)),
+			],
+			"has_data": true,
+			"can_save": can_save,
+		})
+	return rows
+
+
+func show_archive() -> void:
+	archive_layer.call("refresh", _slot_rows())
+	var status := "当前进度可存入任意栏位"
+	if not Game.has_run_save():
+		status = "当前没有可存入的进度"
+	archive_layer.call("set_status", status)
+	archive_layer.visible = true
+	archive_layer.call("focus_first")
+
+
+func _hide_archive() -> void:
+	archive_layer.visible = false
+	title_layer.visible = true
+	title_layer.call("focus_first")
+
+
+func _on_archive_action(id: String) -> void:
+	if id == "back":
+		Sfx.play("ui_cancel")
+		_hide_archive()
+
+
+func _on_archive_slot(id: String, index: int) -> void:
+	var n := index + 1
+	match id:
+		"save":
+			if Game.save_slot(index):
+				Sfx.play("ui_confirm")
+				Events.toast.emit("已存入栏位 %d" % n, UITheme.CYAN)
+			else:
+				Sfx.play("ui_deny")
+				Events.toast.emit("当前没有可存入的进度", UITheme.RED)
+		"load":
+			if Game.load_slot(index):
+				Sfx.play("ui_confirm")
+				Events.toast.emit("已载入栏位 %d，可以继续本局" % n, UITheme.CYAN)
+				title_layer.call("set_resume_visible", Game.has_run_save())
+			else:
+				Sfx.play("ui_deny")
+				Events.toast.emit("栏位 %d 读数失败" % n, UITheme.RED)
+		"delete":
+			Game.delete_slot(index)
+			Sfx.play("ui_deny")
+			Events.toast.emit("已删除栏位 %d" % n, UITheme.TEXT_DIM)
+	archive_layer.call("refresh", _slot_rows())
 
 
 func _build_gameover() -> void:
@@ -267,6 +364,7 @@ func show_title() -> void:
 	set_paused(false)
 	mode = Mode.TITLE
 	title_layer.visible = true
+	archive_layer.visible = false
 	gameover_layer.visible = false
 	panel_layer.visible = false
 	panel_open = false
@@ -277,6 +375,7 @@ func show_title() -> void:
 		int(Game.stats.get("best_floor", 0)),
 		Game.shards_bank,
 	])
+	title_layer.call("set_resume_visible", Game.has_run_save())
 	_focus_first_button()
 
 
@@ -1188,10 +1287,18 @@ func _on_pause_action(id: String) -> void:
 			set_paused(false)
 		"abandon_run":
 			Sfx.play("ui_confirm")
-			_pause_leave("goto_hub")
+			_pause_leave("abandon_run")
 		"goto_title":
 			Sfx.play("ui_confirm")
 			_pause_leave("goto_title")
+		"save_game":
+			if Game.save_run("manual"):
+				Sfx.play("ui_confirm")
+				Events.toast.emit("本局进度已保存", UITheme.CYAN)
+				set_paused(false)
+			else:
+				Sfx.play("ui_deny")
+				Events.toast.emit("此处无法保存", UITheme.TEXT_DIM)
 
 
 func toggle_pause() -> void:

@@ -1,0 +1,434 @@
+[gd_scene format=3 uid="uid://cqbc6ifkwhwce"]
+
+[ext_resource type="Script" uid="uid://xeaj3poiyqyi" path="res://ui/scripts/archive.gd" id="1_er7tp"]
+
+[node name="ArchiveLayer" type="Control" unique_id=1422317251]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_er7tp")
+
+[node name="Dim" type="ColorRect" parent="." unique_id=2098586698]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.023529412, 0.02745098, 0.043137256, 0.92156863)
+
+[node name="Center" type="CenterContainer" parent="." unique_id=716470307]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="PanelContainer" parent="Center" unique_id=1001791752]
+custom_minimum_size = Vector2(940, 620)
+layout_mode = 2
+
+[node name="PanelMargin" type="MarginContainer" parent="Center/Panel" unique_id=1763709183]
+layout_mode = 2
+theme_override_constants/margin_left = 30
+theme_override_constants/margin_top = 26
+theme_override_constants/margin_right = 30
+theme_override_constants/margin_bottom = 26
+
+[node name="PanelVBox" type="VBoxContainer" parent="Center/Panel/PanelMargin" unique_id=1033398875]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Head" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox" unique_id=1808054218]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="HeadBar" type="ColorRect" parent="Center/Panel/PanelMargin/PanelVBox/Head" unique_id=1747932721]
+custom_minimum_size = Vector2(4, 26)
+layout_mode = 2
+color = Color(0.30980393, 0.8392157, 0.78431374, 1)
+
+[node name="HeadTitle" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/Head" unique_id=874942833]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93333334, 0.9529412, 0.972549, 1)
+theme_override_font_sizes/font_size = 24
+text = "存 档 栏 位"
+vertical_alignment = 1
+
+[node name="Divider" type="ColorRect" parent="Center/Panel/PanelMargin/PanelVBox" unique_id=467965702]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(0.16470589, 0.1882353, 0.2509804, 1)
+
+[node name="SlotList" type="VBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox" unique_id=863479755]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="Slot1" type="PanelContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList" unique_id=1251729520]
+custom_minimum_size = Vector2(0, 78)
+layout_mode = 2
+
+[node name="RowMargin" type="MarginContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot1" unique_id=442811503]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 12
+
+[node name="RowHBox" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot1/RowMargin" unique_id=1005661353]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Index" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot1/RowMargin/RowHBox" unique_id=1899720957]
+custom_minimum_size = Vector2(46, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.30980393, 0.8392157, 0.78431374, 1)
+theme_override_font_sizes/font_size = 20
+text = "01"
+vertical_alignment = 1
+
+[node name="Info" type="VBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot1/RowMargin/RowHBox" unique_id=1072472575]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="InfoTitle" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot1/RowMargin/RowHBox/Info" unique_id=322815854]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7764706, 0.8156863, 0.8627451, 1)
+theme_override_font_sizes/font_size = 17
+text = "空 栏 位"
+
+[node name="InfoDesc" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot1/RowMargin/RowHBox/Info" unique_id=2124917307]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49019608, 0.53333336, 0.6, 1)
+theme_override_font_sizes/font_size = 13
+text = "—"
+
+[node name="Actions" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot1/RowMargin/RowHBox" unique_id=454199248]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnSave" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot1/RowMargin/RowHBox/Actions" unique_id=175688249]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "存 入"
+
+[node name="BtnLoad" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot1/RowMargin/RowHBox/Actions" unique_id=1409185285]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "读 取"
+
+[node name="BtnDelete" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot1/RowMargin/RowHBox/Actions" unique_id=233264907]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "删 除"
+
+[node name="Slot2" type="PanelContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList" unique_id=32588525]
+custom_minimum_size = Vector2(0, 78)
+layout_mode = 2
+
+[node name="RowMargin" type="MarginContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot2" unique_id=1703940570]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 12
+
+[node name="RowHBox" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot2/RowMargin" unique_id=1592941329]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Index" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot2/RowMargin/RowHBox" unique_id=1423998171]
+custom_minimum_size = Vector2(46, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.30980393, 0.8392157, 0.78431374, 1)
+theme_override_font_sizes/font_size = 20
+text = "02"
+vertical_alignment = 1
+
+[node name="Info" type="VBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot2/RowMargin/RowHBox" unique_id=901186487]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="InfoTitle" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot2/RowMargin/RowHBox/Info" unique_id=184759771]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7764706, 0.8156863, 0.8627451, 1)
+theme_override_font_sizes/font_size = 17
+text = "空 栏 位"
+
+[node name="InfoDesc" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot2/RowMargin/RowHBox/Info" unique_id=368969789]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49019608, 0.53333336, 0.6, 1)
+theme_override_font_sizes/font_size = 13
+text = "—"
+
+[node name="Actions" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot2/RowMargin/RowHBox" unique_id=767923403]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnSave" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot2/RowMargin/RowHBox/Actions" unique_id=788686054]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "存 入"
+
+[node name="BtnLoad" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot2/RowMargin/RowHBox/Actions" unique_id=510186897]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "读 取"
+
+[node name="BtnDelete" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot2/RowMargin/RowHBox/Actions" unique_id=326521985]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "删 除"
+
+[node name="Slot3" type="PanelContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList" unique_id=961512127]
+custom_minimum_size = Vector2(0, 78)
+layout_mode = 2
+
+[node name="RowMargin" type="MarginContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot3" unique_id=1122900287]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 12
+
+[node name="RowHBox" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot3/RowMargin" unique_id=1873544151]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Index" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot3/RowMargin/RowHBox" unique_id=482720534]
+custom_minimum_size = Vector2(46, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.30980393, 0.8392157, 0.78431374, 1)
+theme_override_font_sizes/font_size = 20
+text = "03"
+vertical_alignment = 1
+
+[node name="Info" type="VBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot3/RowMargin/RowHBox" unique_id=1300460167]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="InfoTitle" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot3/RowMargin/RowHBox/Info" unique_id=840770247]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7764706, 0.8156863, 0.8627451, 1)
+theme_override_font_sizes/font_size = 17
+text = "空 栏 位"
+
+[node name="InfoDesc" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot3/RowMargin/RowHBox/Info" unique_id=1307327505]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49019608, 0.53333336, 0.6, 1)
+theme_override_font_sizes/font_size = 13
+text = "—"
+
+[node name="Actions" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot3/RowMargin/RowHBox" unique_id=1443935795]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnSave" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot3/RowMargin/RowHBox/Actions" unique_id=1596645936]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "存 入"
+
+[node name="BtnLoad" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot3/RowMargin/RowHBox/Actions" unique_id=1878415524]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "读 取"
+
+[node name="BtnDelete" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot3/RowMargin/RowHBox/Actions" unique_id=2076102217]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "删 除"
+
+[node name="Slot4" type="PanelContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList" unique_id=1259420652]
+custom_minimum_size = Vector2(0, 78)
+layout_mode = 2
+
+[node name="RowMargin" type="MarginContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot4" unique_id=188757683]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 12
+
+[node name="RowHBox" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot4/RowMargin" unique_id=1456204240]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Index" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot4/RowMargin/RowHBox" unique_id=179331291]
+custom_minimum_size = Vector2(46, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.30980393, 0.8392157, 0.78431374, 1)
+theme_override_font_sizes/font_size = 20
+text = "04"
+vertical_alignment = 1
+
+[node name="Info" type="VBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot4/RowMargin/RowHBox" unique_id=1372176543]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="InfoTitle" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot4/RowMargin/RowHBox/Info" unique_id=211102853]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7764706, 0.8156863, 0.8627451, 1)
+theme_override_font_sizes/font_size = 17
+text = "空 栏 位"
+
+[node name="InfoDesc" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot4/RowMargin/RowHBox/Info" unique_id=1731681958]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49019608, 0.53333336, 0.6, 1)
+theme_override_font_sizes/font_size = 13
+text = "—"
+
+[node name="Actions" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot4/RowMargin/RowHBox" unique_id=335036043]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnSave" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot4/RowMargin/RowHBox/Actions" unique_id=1449776202]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "存 入"
+
+[node name="BtnLoad" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot4/RowMargin/RowHBox/Actions" unique_id=568620940]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "读 取"
+
+[node name="BtnDelete" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot4/RowMargin/RowHBox/Actions" unique_id=998453641]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "删 除"
+
+[node name="Slot5" type="PanelContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList" unique_id=1133952509]
+custom_minimum_size = Vector2(0, 78)
+layout_mode = 2
+
+[node name="RowMargin" type="MarginContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot5" unique_id=1496174214]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 12
+
+[node name="RowHBox" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot5/RowMargin" unique_id=244214753]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Index" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot5/RowMargin/RowHBox" unique_id=1212648275]
+custom_minimum_size = Vector2(46, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.30980393, 0.8392157, 0.78431374, 1)
+theme_override_font_sizes/font_size = 20
+text = "05"
+vertical_alignment = 1
+
+[node name="Info" type="VBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot5/RowMargin/RowHBox" unique_id=1189642108]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="InfoTitle" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot5/RowMargin/RowHBox/Info" unique_id=2103418463]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7764706, 0.8156863, 0.8627451, 1)
+theme_override_font_sizes/font_size = 17
+text = "空 栏 位"
+
+[node name="InfoDesc" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot5/RowMargin/RowHBox/Info" unique_id=202377602]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49019608, 0.53333336, 0.6, 1)
+theme_override_font_sizes/font_size = 13
+text = "—"
+
+[node name="Actions" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot5/RowMargin/RowHBox" unique_id=1356516580]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnSave" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot5/RowMargin/RowHBox/Actions" unique_id=105468490]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "存 入"
+
+[node name="BtnLoad" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot5/RowMargin/RowHBox/Actions" unique_id=29812890]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "读 取"
+
+[node name="BtnDelete" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/SlotList/Slot5/RowMargin/RowHBox/Actions" unique_id=753545157]
+custom_minimum_size = Vector2(80, 36)
+layout_mode = 2
+text = "删 除"
+
+[node name="Divider2" type="ColorRect" parent="Center/Panel/PanelMargin/PanelVBox" unique_id=2059976977]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(0.16470589, 0.1882353, 0.2509804, 1)
+
+[node name="Foot" type="HBoxContainer" parent="Center/Panel/PanelMargin/PanelVBox" unique_id=381697949]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Status" type="Label" parent="Center/Panel/PanelMargin/PanelVBox/Foot" unique_id=499915248]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.49019608, 0.53333336, 0.6, 1)
+theme_override_font_sizes/font_size = 13
+vertical_alignment = 1
+
+[node name="BtnBack" type="Button" parent="Center/Panel/PanelMargin/PanelVBox/Foot" unique_id=222884345]
+custom_minimum_size = Vector2(150, 40)
+layout_mode = 2
+text = "返 回 标 题"
+
+[node name="ConfirmLayer" type="Control" parent="." unique_id=1153694122]
+visible = false
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="ConfirmDim" type="ColorRect" parent="ConfirmLayer" unique_id=1487164931]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.02, 0.02, 0.03, 0.76)
+
+[node name="ConfirmCenter" type="CenterContainer" parent="ConfirmLayer" unique_id=1860583739]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="ConfirmPanel" type="PanelContainer" parent="ConfirmLayer/ConfirmCenter" unique_id=192028533]
+custom_minimum_size = Vector2(440, 0)
+layout_mode = 2
+
+[node name="ConfirmMargin" type="MarginContainer" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel" unique_id=1517759416]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 18
+
+[node name="ConfirmVBox" type="VBoxContainer" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin" unique_id=2080319789]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ConfirmTitle" type="Label" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox" unique_id=118376631]
+layout_mode = 2
+text = "删 除 栏 位？"
+
+[node name="ConfirmBody" type="Label" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox" unique_id=184920606]
+layout_mode = 2
+text = "该栏位的内容会被永久删除，无法恢复。"
+autowrap_mode = 3
+
+[node name="ConfirmRow" type="HBoxContainer" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox" unique_id=1619949722]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 2
+
+[node name="BtnConfirm" type="Button" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmRow" unique_id=1703189182]
+custom_minimum_size = Vector2(132, 36)
+layout_mode = 2
+text = "确 认 删 除"
+
+[node name="BtnCancel" type="Button" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmRow" unique_id=1945069873]
+custom_minimum_size = Vector2(132, 36)
+layout_mode = 2
+text = "取 消"

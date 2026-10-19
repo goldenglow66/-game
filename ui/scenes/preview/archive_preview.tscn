@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://cseo0b0tb0prb"]
+
+[ext_resource type="Script" uid="uid://xqpaigngr2t0" path="res://ui/scripts/archive_preview.gd" id="1_meic7"]
+[ext_resource type="PackedScene" uid="uid://cqbc6ifkwhwce" path="res://ui/scenes/archive.tscn" id="2_3n1id"]
+
+[node name="ArchivePreview" type="Control" unique_id=285468229]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_meic7")
+
+[node name="Bg" type="ColorRect" parent="." unique_id=53527955]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.039215688, 0.043137256, 0.0627451, 1)
+
+[node name="ArchiveLayer" parent="." unique_id=1422317251 instance=ExtResource("2_3n1id")]
+layout_mode = 1
+grow_horizontal = 2
+grow_vertical = 2

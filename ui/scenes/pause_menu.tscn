@@ -113,3 +113,60 @@ text = "保 存 游 戏"
 layout_mode = 2
 size_flags_horizontal = 3
 text = "返 回 标 题"
+
+[node name="ConfirmLayer" type="Control" parent="." unique_id=430038695]
+visible = false
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="ConfirmDim" type="ColorRect" parent="ConfirmLayer" unique_id=1002869959]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.02, 0.02, 0.03, 0.72)
+
+[node name="ConfirmCenter" type="CenterContainer" parent="ConfirmLayer" unique_id=1539620443]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="ConfirmPanel" type="PanelContainer" parent="ConfirmLayer/ConfirmCenter" unique_id=1076950512]
+custom_minimum_size = Vector2(460, 0)
+layout_mode = 2
+
+[node name="ConfirmMargin" type="MarginContainer" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel" unique_id=1263792143]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="ConfirmVBox" type="VBoxContainer" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin" unique_id=1150336116]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ConfirmTitle" type="Label" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox" unique_id=932071678]
+layout_mode = 2
+text = "放 弃 本 局？"
+
+[node name="ConfirmBody" type="Label" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox" unique_id=702297016]
+layout_mode = 2
+text = "本局进度会全部丢失，退出后从 B2 裁断安全屋重新开始。
+已存入存档栏位的进度不受影响。"
+autowrap_mode = 3
+
+[node name="ConfirmRow" type="HBoxContainer" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox" unique_id=413808478]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 2
+
+[node name="BtnConfirm" type="Button" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmRow" unique_id=1476361695]
+custom_minimum_size = Vector2(132, 36)
+layout_mode = 2
+text = "确 认 放 弃"
+
+[node name="BtnCancel" type="Button" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmRow" unique_id=1570233028]
+custom_minimum_size = Vector2(132, 36)
+layout_mode = 2
+text = "取 消"

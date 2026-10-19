@@ -7,22 +7,42 @@ extends Control
 ##
 ## 本脚本不引用 Game / Sfx / RunState —— 按钮只发 `action(id)` 信号，
 ## 由宿主（ui_root.gd 或预览脚本）决定这几个 id 该干什么。
+## 「继续本局」是否出现也由宿主调 `set_resume_visible()` 决定。
 
 signal action(id: String)
 signal hover(id: String)
 
-const BTN_IDS: Array[String] = ["goto_hub", "begin_run", "wipe_save"]
-const ACCENTS: Array[Color] = [UITheme.CYAN, UITheme.RED, Color("5a6474")]
+const BTN_IDS: Array[String] = [
+	"resume_run",
+	"goto_hub",
+	"begin_run",
+	"open_archive",
+	"open_settings",
+	"wipe_save",
+]
+## 「游戏存档」「游戏设置」当前只是摆位（场景里 disabled），给灰色点缀即可。
+const ACCENTS: Array[Color] = [
+	UITheme.GOLD,
+	UITheme.CYAN,
+	UITheme.RED,
+	Color("5a6474"),
+	Color("5a6474"),
+	Color("5a6474"),
+]
 
 @onready var _info: Label = $TitleInfo
+@onready var _resume: Button = $MenuPanel/MenuMargin/MenuVBox/BtnResume
 var _buttons: Array[Button] = []
 
 
 func _ready() -> void:
 	_apply_fonts()
 	_buttons = [
+		_resume,
 		$MenuPanel/MenuMargin/MenuVBox/BtnHub,
 		$MenuPanel/MenuMargin/MenuVBox/BtnRun,
+		$MenuPanel/MenuMargin/MenuVBox/BtnArchive,
+		$MenuPanel/MenuMargin/MenuVBox/BtnSettings,
 		$MenuPanel/MenuMargin/MenuVBox/BtnWipe,
 	]
 	for i in _buttons.size():
@@ -46,6 +66,11 @@ func _wire(b: Button, id: String) -> void:
 ## 右下角的进度统计。宿主在显示标题页前调用。
 func set_info(text: String) -> void:
 	_info.text = text
+
+
+## 「继续本局」只在存在续关存档时露出来。
+func set_resume_visible(v: bool) -> void:
+	_resume.visible = v
 
 
 ## 聚焦第一个可用按钮（键盘可达）。

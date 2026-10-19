@@ -13,6 +13,7 @@ const PREVIEW_INFO := "已出击 5 次 · 最长下潜 3 扇区 · 织网碎片 
 func _ready() -> void:
 	_title.visible = true
 	_title.call("set_info", PREVIEW_INFO)
+	_title.call("set_resume_visible", true)
 	_title.connect("action", _on_action)
 	_title.connect("hover", _on_hover)
 	_title.call("focus_first")

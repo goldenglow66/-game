@@ -19,7 +19,18 @@ var screen: int = Screen.TITLE
 var last_banked: int = 0
 
 
+## 独占全屏要主动设一次。项目设置里的 `window/size/mode` 只是窗口初始形态，
+## 被外部启动方式（编辑器运行、某些 launcher）接管时可能退化成无边框窗口——
+## 那种形态下 Windows 任务栏会浮在游戏画面上面。
+func _force_fullscreen() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
+
+
 func _ready() -> void:
+	_force_fullscreen()
 	Game.main = self
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	randomize()
@@ -1037,6 +1048,13 @@ func goto_title() -> void:
 	ui.show_title()
 
 
+## 放弃本局：不结算本次收益，清掉续关存档后回安全屋。
+## 和 goto_hub() 分开，是因为只有这里需要动 run 与存档。
+func abandon_run() -> void:
+	Game.abandon_run()
+	goto_hub()
+
+
 func goto_hub() -> void:
 	_clear_world()
 	# 上一局的 run 在这里作废；碎片已在 end_run() 结算入库，不能重复计入
@@ -1054,6 +1072,21 @@ func begin_run(seed_value: int = 0) -> void:
 	_clear_world()
 	screen = Screen.RUN
 	Game.start_run(seed_value)
+	var w := RunWorldScript.new()
+	w.name = "RunWorld"
+	world_root.add_child(w)
+	current_world = w
+	ui.show_hud()
+
+
+## 从续关存档继续：重建 RunState 与地图，玩家落回保存时所在房间的入口。
+## 不走 start_run()，所以不会清掉刚读出来的存档，也不重复计一次「出击」。
+func resume_run() -> void:
+	if not Game.prepare_resume():
+		Events.toast.emit("没有可继续的存档", UITheme.TEXT_DIM)
+		return
+	_clear_world()
+	screen = Screen.RUN
 	var w := RunWorldScript.new()
 	w.name = "RunWorld"
 	world_root.add_child(w)

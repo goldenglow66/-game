@@ -307,3 +307,95 @@ func settle_death(drop_ratio: float) -> int:
 func settle_victory() -> int:
 	shards_banked = shards
 	return shards_banked
+
+
+# ================= 存档序列化 =================
+#
+# 局内续关只存「这一局的状态」，据点元进度另有 cage_save.json。
+# `stats` 是 recalc() 的产物，不存；读档时按存档里的 stacks 重算，
+# 这样永久升级和词条改动都能自动跟上。
+
+func to_dict() -> Dictionary:
+	return {
+		"seed_value": seed_value,
+		"floor_index": floor_index,
+		"room_index": room_index,
+		"rooms_cleared": rooms_cleared,
+		"kills": kills,
+		"elites_killed": elites_killed,
+		"bosses_killed": bosses_killed,
+		"max_hp": max_hp,
+		"bonus_max_hp": bonus_max_hp,
+		"hp": hp,
+		"max_ge": max_ge,
+		"ge": ge,
+		"max_st": max_st,
+		"st": st,
+		"max_heat": max_heat,
+		"heat": heat,
+		"pollution": pollution,
+		"shards": shards,
+		"coins": coins,
+		"shards_banked": shards_banked,
+		"stacks": stacks.duplicate(),
+		"acquired_order": acquired_order.duplicate(),
+		"consumables": consumables.duplicate(),
+		"weapon": weapon.duplicate(true),
+		"revive_used": revive_used,
+		"narrative_flags": narrative_flags.duplicate(true),
+	}
+
+
+static func from_dict(d: Dictionary) -> RunState:
+	var r := RunState.new(int(d.get("seed_value", 0)))
+	r.floor_index = int(d.get("floor_index", 0))
+	r.room_index = int(d.get("room_index", 0))
+	r.rooms_cleared = int(d.get("rooms_cleared", 0))
+	r.kills = int(d.get("kills", 0))
+	r.elites_killed = int(d.get("elites_killed", 0))
+	r.bosses_killed = int(d.get("bosses_killed", 0))
+	r.bonus_max_hp = float(d.get("bonus_max_hp", 0.0))
+	r.pollution = float(d.get("pollution", 0.0))
+	r.shards = int(d.get("shards", 0))
+	r.coins = int(d.get("coins", 0))
+	r.shards_banked = int(d.get("shards_banked", 0))
+	r.revive_used = bool(d.get("revive_used", false))
+
+	var st = d.get("stacks", {})
+	if typeof(st) == TYPE_DICTIONARY:
+		r.stacks = {}
+		for k in st.keys():
+			r.stacks[str(k)] = int(st[k])
+
+	var order = d.get("acquired_order", [])
+	if typeof(order) == TYPE_ARRAY:
+		r.acquired_order.clear()
+		for item in order:
+			r.acquired_order.append(str(item))
+
+	var cons = d.get("consumables", {})
+	if typeof(cons) == TYPE_DICTIONARY:
+		r.consumables = {}
+		for k in cons.keys():
+			r.consumables[str(k)] = int(cons[k])
+
+	var wp = d.get("weapon", {})
+	if typeof(wp) == TYPE_DICTIONARY and not wp.is_empty():
+		r.weapon = wp.duplicate(true)
+
+	var flags = d.get("narrative_flags", {})
+	if typeof(flags) == TYPE_DICTIONARY:
+		r.narrative_flags = flags.duplicate(true)
+
+	# 先按存下来的构筑重算一遍上限与属性，再用存档里的当前值覆盖，
+	# 这样读档后的血量不会因为「上限变了」而被 recalc 挪动。
+	r.recalc(false)
+	r.max_hp = float(d.get("max_hp", r.max_hp))
+	r.max_ge = float(d.get("max_ge", r.max_ge))
+	r.max_st = float(d.get("max_st", r.max_st))
+	r.max_heat = float(d.get("max_heat", r.max_heat))
+	r.hp = clampf(float(d.get("hp", r.hp)), 0.0, r.max_hp)
+	r.ge = clampf(float(d.get("ge", r.ge)), 0.0, r.max_ge)
+	r.st = clampf(float(d.get("st", r.st)), 0.0, r.max_st)
+	r.heat = clampf(float(d.get("heat", 0.0)), 0.0, r.max_heat)
+	return r

@@ -134,6 +134,7 @@ func save_meta() -> void:
 
 
 func reset_save() -> void:
+	clear_run_save()
 	shards_bank = 0
 	coins_bank = 0
 	pending_boons.clear()
@@ -142,6 +143,194 @@ func reset_save() -> void:
 	for key in META_UPGRADES.keys():
 		meta_upgrades[key] = 0
 	save_meta()
+
+
+# ---------------- 局内续关存档 ----------------
+
+## 局内续关存档，跟据点元进度（cage_save.json）分开存放。
+##
+## 两种写法，由 `mode` 区分：
+## - `"manual"`：玩家在暂停菜单主动保存 —— 记精确坐标 + 房间 payload，
+##   读档后站回原处，商店/事件房保持保存时的状态。
+## - `"auto"`：每进一个新房间静默写一次 —— 只记房间入口，不记 payload。
+##   玩家直接关窗口（非正常退出）时，最后一次自动记录就是回退点，
+##   读档后从那个房间门口开始，商店/休整房回到原始可交互状态。
+const RUN_SAVE_PATH := "user://cage_run.json"
+const RUN_SAVE_VERSION := 2
+
+## 当前正在跑的 RunWorld，由 run_world.gd 注册；存档时从它读房间清理状态。
+var run_world: Node = null
+
+## 读档后等 RunWorld 消费的快照，消费完立刻清空，避免被下一局误用。
+var resume_snapshot: Dictionary = {}
+
+
+## 只认得出「能用的」存档：版本不匹配或结构坏掉的文件当作不存在，
+## 免得标题页出现一个点下去必然失败的「继续本局」。
+func has_run_save() -> bool:
+	return not read_run_save().is_empty()
+
+
+func clear_run_save() -> void:
+	if not FileAccess.file_exists(RUN_SAVE_PATH):
+		return
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(RUN_SAVE_PATH))
+
+
+## 把当前这一局写进续关存档。当前不在局内或写盘失败返回 false。
+## mode = "manual" 记精确坐标与房间状态；"auto" 只记房间入口。
+func save_run(mode: String = "manual") -> bool:
+	if run == null or run_world == null or not is_instance_valid(run_world):
+		return false
+
+	var level = run_world.get("level")
+	var cleared: Array[int] = []
+	var room_index: int = 0
+	var here = run_world.get("_current_room")
+	if here != null:
+		room_index = int(here.index)
+	if level != null:
+		for item in level.rooms:
+			var room: Room = item
+			if room.cleared:
+				cleared.append(room.index)
+
+	var data := {
+		"version": RUN_SAVE_VERSION,
+		"mode": mode,
+		"run": run.to_dict(),
+		"cleared": cleared,
+		"room_index": room_index,
+		"saved_at": Time.get_unix_time_from_system(),
+	}
+
+	if mode == "manual":
+		var p = run_world.get("player")
+		if p != null:
+			data["pos"] = {"x": p.global_position.x, "y": p.global_position.y}
+		data["payloads"] = _collect_room_payloads(level)
+
+	return _write_save_file(RUN_SAVE_PATH, data)
+
+
+## 收集房间 payload 里可序列化的部分（丢掉节点引用）。
+## 现在商店是无限货架、没有「已购」概念，所以这份数据主要用于事件房；
+## 以后商店要记库存，把清单塞进 payload 就能随手动存档一起保住。
+func _collect_room_payloads(level) -> Dictionary:
+	var out := {}
+	if level == null:
+		return out
+	for item in level.rooms:
+		var room: Room = item
+		var src: Dictionary = room.payload
+		if src.is_empty():
+			continue
+		var clean := {}
+		for k in src.keys():
+			var v = src[k]
+			# 只留标量。Color / Vector2 / 节点引用序列化过去会变成字符串或直接丢失，
+			# 恢复时反而添乱，一律不进存档。
+			if not (v is String or v is int or v is float or v is bool):
+				continue
+			clean[str(k)] = v
+		if not clean.is_empty():
+			out[str(room.index)] = clean
+	return out
+
+
+## 读出续关存档；没有或版本不匹配返回空字典。
+func read_run_save() -> Dictionary:
+	return _read_save_file(RUN_SAVE_PATH)
+
+
+# ================= 存档栏位（标题页「游戏存档」） =================
+## 五个手动栏位。栏位里放的是一份「续关存档的副本」—— 只备份局内进度，
+## 据点里的永久升级 / 织网碎片 / 盲区币不受栏位影响，不会被读档回滚。
+const SLOT_COUNT := 5
+
+
+func slot_path(i: int) -> String:
+	# 文件名用 1..SLOT_COUNT，和界面上的「01」「02」对得上，方便手动排查。
+	return "user://cage_slot_%d.json" % (i + 1)
+
+
+## 栏位摘要，给界面显示用；空栏位或文件不可用返回空字典。
+func slot_meta(i: int) -> Dictionary:
+	var d := _read_save_file(slot_path(i))
+	if d.is_empty():
+		return {}
+	var r: Dictionary = d.get("run", {})
+	var cleared = d.get("cleared", [])
+	return {
+		"floor": int(r.get("floor_index", 0)),
+		"room": int(d.get("room_index", 0)),
+		"rooms_cleared": cleared.size() if typeof(cleared) == TYPE_ARRAY else int(r.get("rooms_cleared", 0)),
+		"hp": float(r.get("hp", 0.0)),
+		"max_hp": float(r.get("max_hp", 1.0)),
+		"saved_at": float(d.get("saved_at", 0.0)),
+		"mode": str(d.get("mode", "auto")),
+	}
+
+
+## 把当前续关存档复制进第 i 个栏位。当前没有存档时返回 false。
+func save_slot(i: int) -> bool:
+	var d := read_run_save()
+	if d.is_empty():
+		return false
+	return _write_save_file(slot_path(i), d)
+
+
+## 把第 i 个栏位写回当前续关存档，之后回标题页就能「继续本局」。
+func load_slot(i: int) -> bool:
+	var d := _read_save_file(slot_path(i))
+	if d.is_empty():
+		return false
+	return _write_save_file(RUN_SAVE_PATH, d)
+
+
+func delete_slot(i: int) -> void:
+	var p := slot_path(i)
+	if FileAccess.file_exists(p):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
+
+
+func _read_save_file(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var text := f.get_as_text()
+	f.close()
+	var parsed = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	var data: Dictionary = parsed
+	if int(data.get("version", 0)) != RUN_SAVE_VERSION:
+		return {}
+	if typeof(data.get("run")) != TYPE_DICTIONARY:
+		return {}
+	return data
+
+
+func _write_save_file(path: String, data: Dictionary) -> bool:
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		push_warning("无法写入存档：%s" % path)
+		return false
+	f.store_string(JSON.stringify(data, "\t"))
+	f.close()
+	return true
+
+
+## 把续关存档载进 Game.run，并把房间状态留给 RunWorld 消费。成功返回 true。
+func prepare_resume() -> bool:
+	var data := read_run_save()
+	if data.is_empty():
+		return false
+	resume_snapshot = data
+	run = RunState.from_dict(data["run"])
+	return true
 
 
 func meta_cost(key: String) -> int:
@@ -211,6 +400,8 @@ func pollution_gain_mult() -> float:
 # ================= 局（run）生命周期 =================
 
 func start_run(p_seed: int = 0) -> RunState:
+	# 开新局 = 旧的续关存档作废，免得「继续本局」把玩家拉回上一局
+	clear_run_save()
 	_pending_seed = p_seed
 	run = RunState.new(p_seed)
 	# 暗格权限：开局携带随机词条
@@ -283,6 +474,7 @@ func refund_shop(key: String) -> bool:
 
 
 func end_run(victory: bool) -> int:
+	clear_run_save()
 	if run == null:
 		return 0
 	var banked := 0
@@ -310,6 +502,7 @@ func finish_run_to_hub(victory: bool) -> int:
 
 
 func abandon_run() -> void:
+	clear_run_save()
 	if run != null:
 		shards_bank += int(run.shards_banked)
 	run = null

@@ -31,6 +31,8 @@ layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1_6v464")
 
 [node name="TitleInfo" type="Label" parent="." unique_id=1709595179]
@@ -119,14 +121,34 @@ layout_mode = 2
 theme_override_constants/separation = 10
 alignment = 1
 
+[node name="BtnResume" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=1904803722]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+text = "继 续 本 局"
+
 [node name="BtnHub" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=980092452]
 layout_mode = 2
+size_flags_horizontal = 3
 text = "进 入 安 全 屋"
 
 [node name="BtnRun" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=1653824661]
 layout_mode = 2
+size_flags_horizontal = 3
 text = "直 接 出 击（测试）"
+
+[node name="BtnArchive" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=1588175524]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "游 戏 存 档"
+
+[node name="BtnSettings" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=949929043]
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "游 戏 设 置"
 
 [node name="BtnWipe" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=32982494]
 layout_mode = 2
+size_flags_horizontal = 3
 text = "清 除 存 档"
