@@ -1,4 +1,4 @@
-﻿; Engine configuration file.
+; Engine configuration file.
 ; It's best edited using the editor UI and not directly,
 ; since the parameters that go here are not all obvious.
 ;
@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="绗间腑澧熷奖 / Ghost in the Iron Shell"
-config/description="绉戝够妯澘鍔ㄤ綔鑲夐附銆傚墤銆佺浘銆侀摮涓変綅涓€浣擄紝骞界伒褰㈡€侀獓鍏ョ綉缁溿€?
+config/name="笼中墟影 / Ghost in the Iron Shell"
+config/description="科幻横板动作肉鸽。剑、盾、铳三位一体，幽灵形态骇入网络。"
 run/main_scene="res://scenes/Main.tscn"
 config/use_custom_user_dir=true
 config/custom_user_dir_name="cage-shadow"
@@ -28,16 +28,21 @@ Sfx="*res://scripts/core/sfx.gd"
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
-; 閿佸畾鍏ㄥ睆锛? = Exclusive Fullscreen锛堢嫭鍗犲叏灞忥級銆? = Fullscreen 鏄?; 銆屾棤杈规绐楀彛銆嶏紝Windows 浠诲姟鏍忎細娴湪鐢婚潰涔嬩笂锛涚嫭鍗犲叏灞忔墠鐪熸鎺ョ鏄剧ず鍣ㄣ€?window/size/mode=4
+; 锁定全屏：4 = Exclusive Fullscreen（独占全屏）。3 = Fullscreen 是
+; 「无边框窗口」，Windows 任务栏会浮在画面之上；独占全屏才真正接管显示器。
+window/size/mode=4
 window/size/resizable=false
-; viewport锛氭暣骞呯敾闈㈡寜 1280x720 娓叉煋鍚庣粺涓€缂╂斁锛岀獥鍙ｅ昂瀵稿彉鍖栨椂
-; Control 甯冨眬涓嶇敤閫愬抚閲嶇畻锛屾嫋绐?缂╂斁鏄庢樉鏇磋窡鎵嬨€?window/stretch/mode="viewport"
-; expand锛氱敾闈㈡寜姣斾緥鎵╁睍鍒板～婊℃暣鍧楀睆骞曪紝涓嶇暀榛戣竟銆?window/stretch/aspect="expand"
-; 鎷栧姩绐楀彛鏃?Windows 浼氳繘鍏?modal move loop锛屽悓姝ョ瓑寰呭瀭鐩村悓姝ヤ細璁╃敾闈㈡槑鏄炬粸鍚庛€?window/vsync/vsync_mode=0
+; viewport：整幅画面按 1280x720 渲染后统一缩放，窗口尺寸变化时
+; Control 布局不用逐帧重算，拖窗/缩放明显更跟手。
+window/stretch/mode="viewport"
+; expand：画面按比例扩展到填满整块屏幕，不留黑边。
+window/stretch/aspect="expand"
+; 拖动窗口时 Windows 会进入 modal move loop，同步等待垂直同步会让画面明显滞后。
+window/vsync/vsync_mode=0
 
 [dotnet]
 
-project/assembly_name="绗间腑澧熷奖 - Ghost in the Iron Shell"
+project/assembly_name="笼中墟影 - Ghost in the Iron Shell"
 
 [layer_names]
 
@@ -57,7 +62,8 @@ project/assembly_name="绗间腑澧熷奖 - Ghost in the Iron Shell"
 
 [rendering]
 
-; 2D 妯澘鐢?OpenGL 鍚庣锛氬惎鍔ㄥ揩銆佹樉瀛樺崰鐢ㄤ綆锛學indows 涓嬬獥鍙ｄ氦浜掍篃鏇寸ǔ銆?renderer/rendering_method="gl_compatibility"
+; 2D 横板用 OpenGL 后端：启动快、显存占用低，Windows 下窗口交互也更稳。
+renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 anti_aliasing/quality/msaa_2d=1
 environment/defaults/default_clear_color=Color(0.043, 0.047, 0.066, 1)
