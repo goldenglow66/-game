@@ -216,7 +216,17 @@ func _on_title_action(id: String) -> void:
 	match id:
 		"resume_run":
 			Sfx.play("ui_confirm")
-			goto_screen("resume_run")
+			# 首格「继续本局」/「进入安全屋」按存档有无切换行为。
+			if Game.has_run_save():
+				goto_screen("resume_run")
+			else:
+				goto_screen("goto_hub")
+		"abandon_run":
+			# 只清掉进行中的这一局，人留在标题页；首格随之退回「进入安全屋」。
+			Game.clear_run_save()
+			_refresh_title_entry()
+			Sfx.play("ui_deny")
+			Events.toast.emit("已放弃本局", UITheme.AMBER)
 		"goto_hub":
 			Sfx.play("ui_confirm")
 			goto_screen("goto_hub")
@@ -230,6 +240,9 @@ func _on_title_action(id: String) -> void:
 		"open_archive":
 			Sfx.play("ui_confirm")
 			show_archive()
+		"quit_game":
+			Sfx.play("ui_cancel")
+			get_tree().quit()
 
 
 # ================= 存档栏位 =================
@@ -309,7 +322,7 @@ func _on_archive_slot(id: String, index: int) -> void:
 			if Game.load_slot(index):
 				Sfx.play("ui_confirm")
 				Events.toast.emit("已载入栏位 %d，可以继续本局" % n, UITheme.CYAN)
-				title_layer.call("set_resume_visible", Game.has_run_save())
+				_refresh_title_entry()
 			else:
 				Sfx.play("ui_deny")
 				Events.toast.emit("栏位 %d 读数失败" % n, UITheme.RED)
@@ -375,8 +388,18 @@ func show_title() -> void:
 		int(Game.stats.get("best_floor", 0)),
 		Game.shards_bank,
 	])
-	title_layer.call("set_resume_visible", Game.has_run_save())
+	title_layer.call("set_resume_visible", true)
+	title_layer.call("set_resume_text", "继 续 本 局" if Game.has_run_save() else "进 入 安 全 屋")
+	title_layer.call("set_abandon_enabled", Game.has_run_save())
 	_focus_first_button()
+
+
+## 标题页首格兼入口：有存档 =「继续本局」，无存档 =「进入安全屋」。
+func _refresh_title_entry() -> void:
+	var has_save := Game.has_run_save()
+	title_layer.call("set_resume_visible", true)
+	title_layer.call("set_resume_text", "继 续 本 局" if has_save else "进 入 安 全 屋")
+	title_layer.call("set_abandon_enabled", has_save)
 
 
 func show_hub() -> void:

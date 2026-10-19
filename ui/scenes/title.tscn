@@ -130,12 +130,7 @@ text = "继 续 本 局"
 [node name="BtnHub" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=980092452]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "进 入 安 全 屋"
-
-[node name="BtnRun" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=1653824661]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "直 接 出 击（测试）"
+text = "放 弃 本 局 游 戏"
 
 [node name="BtnArchive" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=1588175524]
 layout_mode = 2
@@ -151,4 +146,4 @@ text = "游 戏 设 置"
 [node name="BtnWipe" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=32982494]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "清 除 存 档"
+text = "退 出 游 戏"
