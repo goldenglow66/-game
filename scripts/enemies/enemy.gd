@@ -2,6 +2,18 @@ class_name Enemy
 extends CharacterBody2D
 ## 敌人实体：一个带 AI 状态机的横板单位。
 ##
+## 【状态机怎么转】
+##   IDLE → PATROL   没看见玩家时在原地附近来回踱步
+##   PATROL → CHASE  玩家进入 `aggro` 半径
+##   CHASE → WINDUP  进入攻击距离，开始前摇（**此时可以被打断**）
+##   WINDUP → RECOVER 出手后的硬直 —— 这是玩家的反击窗口
+##   RECOVER → CHASE 循环；`HURT` 可在任意状态被打断；`DEAD` 是终态
+## 状态推进集中在 `_think()` 与 `_tick_status()`，绘制在 `_draw()`，互不干扰。
+##
+## 【具体打法由 behavior 决定】walker / rusher / ranged / lobber / turret /
+## flyer / swarm / elite 八种，`_think()` 里按 behavior 分支。
+## 加新敌人优先复用现有 behavior + 改数值，别急着新写一种。
+##
 ## 与玩家/弹道的接口约定（改这里前先确认三处调用方）：
 ##   - collision_layer 固定为 4（玩家挥剑的 shape 查询、玩家弹道的 ray 都按 4 找目标）
 ##   - collision_mask 固定为 1（只与世界碰撞，敌人之间不互相推挤）
@@ -295,6 +307,11 @@ func _tick_status(delta: float) -> void:
 		hp_bar_t = maxf(hp_bar_t, 0.4)
 
 
+## AI 主逻辑。前半段是所有敌人共用的状态机推进（硬直/收招/前摇），
+## 后半段按 `behavior` 分支决定怎么追、怎么出手。
+##
+## 改这里要小心：这一段同时管着「能不能动」和「什么时候出手」，
+## 挪错一行就会出现「敌人站着不动」或「取消前摇直接秒人」。
 func _think(delta: float) -> void:
 	# ---- 硬直 / 攻击收招 ----
 	if state == State.HURT:

@@ -30,6 +30,15 @@ const ACCENTS: Array[Color] = [
 
 @onready var _info: Label = $TitleInfo
 @onready var _resume: Button = $MenuPanel/MenuMargin/MenuVBox/BtnResume
+@onready var _abandon: Button = $MenuPanel/MenuMargin/MenuVBox/BtnHub
+
+@onready var _confirm: Control = $ConfirmLayer
+@onready var _confirm_panel: PanelContainer = $ConfirmLayer/ConfirmCenter/ConfirmPanel
+@onready var _confirm_title: Label = $ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmTitle
+@onready var _confirm_body: Label = $ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmBody
+@onready var _btn_confirm: Button = $ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmRow/BtnConfirm
+@onready var _btn_cancel: Button = $ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmRow/BtnCancel
+
 var _buttons: Array[Button] = []
 
 
@@ -37,7 +46,7 @@ func _ready() -> void:
 	_apply_fonts()
 	_buttons = [
 		_resume,
-		$MenuPanel/MenuMargin/MenuVBox/BtnHub,
+		_abandon,
 		$MenuPanel/MenuMargin/MenuVBox/BtnArchive,
 		$MenuPanel/MenuMargin/MenuVBox/BtnSettings,
 		$MenuPanel/MenuMargin/MenuVBox/BtnWipe,
@@ -45,6 +54,8 @@ func _ready() -> void:
 	for i in _buttons.size():
 		UITheme.style_button(_buttons[i], ACCENTS[i])
 		_wire(_buttons[i], BTN_IDS[i])
+	_dress_confirm()
+	_confirm.visible = false
 
 
 ## 中文字形只能在运行时挂载 —— Label 不设字体就是豆腐块。
@@ -55,9 +66,60 @@ func _apply_fonts() -> void:
 
 
 func _wire(b: Button, id: String) -> void:
-	b.pressed.connect(func() -> void: action.emit(id))
+	# 「放弃本局游戏」不可逆，先过一道确认再发信号。
+	if id == "abandon_run":
+		b.pressed.connect(_show_confirm)
+	else:
+		b.pressed.connect(func() -> void: action.emit(id))
 	b.mouse_entered.connect(func() -> void: hover.emit(id))
 	b.focus_entered.connect(func() -> void: hover.emit(id))
+
+
+## 「放弃本局游戏」的二次确认框样式（标题页最危险的那个按钮）。
+func _dress_confirm() -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color("12141cf4")
+	sb.border_color = UITheme.RED.darkened(0.35)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(4)
+	sb.content_margin_left = 0.0
+	sb.content_margin_right = 0.0
+	sb.content_margin_top = 0.0
+	sb.content_margin_bottom = 0.0
+	_confirm_panel.add_theme_stylebox_override("panel", sb)
+
+	_confirm_title.add_theme_font_size_override("font_size", 22)
+	_confirm_title.add_theme_color_override("font_color", UITheme.TEXT_BRIGHT)
+	_confirm_body.add_theme_font_size_override("font_size", 14)
+	_confirm_body.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+	UITheme.style_button(_btn_confirm, UITheme.RED)
+	UITheme.style_button(_btn_cancel, UITheme.CYAN)
+	for b in [_btn_confirm, _btn_cancel]:
+		(b as Button).add_theme_font_size_override("font_size", 15)
+		(b as Button).mouse_entered.connect(func() -> void: hover.emit("confirm"))
+
+	_btn_confirm.pressed.connect(func() -> void: action.emit("abandon_run"))
+	_btn_cancel.pressed.connect(_hide_confirm)
+
+
+func _show_confirm() -> void:
+	_confirm.visible = true
+	# 默认焦点给「取消」，误按两下 Enter 不会丢进度。
+	_btn_cancel.grab_focus()
+
+
+func _hide_confirm() -> void:
+	_confirm.visible = false
+	_abandon.grab_focus()
+
+
+## 确认弹窗开着时，Esc 只关弹窗。
+func _input(event: InputEvent) -> void:
+	if not _confirm.visible:
+		return
+	if event.is_action_pressed("cancel"):
+		_hide_confirm()
+		get_viewport().set_input_as_handled()
 
 
 ## 右下角的进度统计。宿主在显示标题页前调用。
@@ -77,7 +139,9 @@ func set_resume_text(t: String) -> void:
 
 ## 没有进行中的局时，「放弃本局游戏」无事可做，灰掉。
 func set_abandon_enabled(v: bool) -> void:
-	($MenuPanel/MenuMargin/MenuVBox/BtnHub as Button).disabled = not v
+	_abandon.disabled = not v
+	if not v:
+		_confirm.visible = false
 
 
 ## 聚焦第一个可用按钮（键盘可达）。

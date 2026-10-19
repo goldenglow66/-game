@@ -59,7 +59,10 @@ signal ghost_form_changed(active: bool)
 
 # ---------------- 状态 ----------------
 var facing: int = 1
-var action: String = ""          # "", "attack", "dash", "bash", "hurt"
+## 当前互斥动作："" 表示空闲，"attack"/"dash"/"bash"/"hurt" 表示正在做某个动作。
+## 与之配套的是 `action_t`（已进行多久）与 `action_total`（总共多久），
+## 两者相等即动作结束、`action` 会被清空。**判断能否出招只看 `action == ""`**。
+var action: String = ""
 var action_t: float = 0.0
 var action_total: float = 0.0
 var combo_index: int = -1
@@ -124,6 +127,23 @@ func emit_vitals() -> void:
 
 
 # ================= 主循环 =================
+#
+# 每物理帧固定跑这一串，**顺序不能随便换**：
+#   1. 递减各种冷却计时器（无敌帧、射击 CD、冲刺 CD、连击窗口…）
+#   2. 若已死则直接返回（尸体不再响应输入）
+#   3. `_tick_action()`     推进当前动作的进度，动作结束就清空
+#   4. `_tick_timers()`     土狼时间、跳跃缓冲、体力回复延迟
+#   5. `_read_input()`      读输入并派发动作（跳跃/冲刺/挥剑/格挡/射击/探测/交互）
+#   6. `_apply_physics()`   重力、加速、摩擦
+#   7. `_update_vitals()`   热量与姿态的回复
+#   8. `_update_interactable()` 找最近的可交互物，供 UI 显示提示
+#   9. `_update_hack()`     骇入进度推进
+#  10. `move_and_slide()`   真正移动
+#
+# 【状态机的两条线】
+# - `action` 是**互斥动作**（挥剑/冲刺/盾击/受击），同一时刻只能有一个
+# - `ghost_form` / `is_guarding` / `charging` 是**姿态标记**，可与动作并存
+# 判断"能不能再出招"看 `action == ""`，不要去看 `action_t`。
 
 func _physics_process(delta: float) -> void:
 	anim_t += delta

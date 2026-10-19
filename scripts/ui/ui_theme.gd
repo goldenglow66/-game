@@ -1,7 +1,21 @@
 class_name UITheme
 extends RefCounted
 ## 统一视觉风格：《笼中墟影》的「冷峻、潮湿、低饱和霓虹」。
-## 同时负责中文字体加载 —— Godot 默认字体不含 CJK 字形，必须在运行时挂载系统中文字体。
+##
+## 【怎么用】所有界面脚本都从这里取颜色和样式，**不要在界面里写死颜色值** ——
+## 想整体调色调，只改这一个文件就够了。
+##
+## 【它还负责中文字体】Godot 内置字体不含 CJK 字形，不挂字体的话中文全是方块。
+## 所以每个 Label / Button 都要在运行时 `add_theme_font_override("font", UITheme.get_font())`。
+## `get_font()` 带三级降级：工程自带字体 → 系统中文字体候选表 → ThemeDB 兜底。
+##
+## 【配色语义】
+## - CYAN  织网 / 幽灵 / 中性强调（绝大多数可点击元素）
+## - VIOLET 幽灵能量
+## - AMBER 铳 / 热量 / 需要警惕但不算危险的操作
+## - RED   危险 / 污染 / 不可逆操作（删除、放弃本局）
+## - GREEN 回复
+## - GOLD  传说品质 / 盲区币
 
 # ---------------- 配色 ----------------
 const BG          := Color("0a0b10")
@@ -20,6 +34,7 @@ const RED         := Color("e0554f")   # 危险 / 污染
 const GREEN       := Color("7fd97f")   # 回复
 const GOLD        := Color("e8c86a")   # 传说 / 盲区币
 
+## 词条品质 → 颜色。三选一卡片、背包列表都用它。
 const RARITY := {
 	"common": Color("9aa6b4"),
 	"rare":   Color("4fa8e0"),

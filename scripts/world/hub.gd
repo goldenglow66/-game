@@ -79,11 +79,19 @@ func _build_props() -> void:
 	_add_interactable("exit", "出击升降机", "出勤：进入织网", Vector2(1740.0, 0.0), Vector2(140.0, 200.0), UITheme.RED)
 
 
+## 在场景里放一个可交互物件（长椅 / 改造台 / 黑市 / 离线终端 / 出击升降机）。
+##
+## 参数：`kind` 是面板标识（`bench` / `rig` / `market` / `terminal` / `exit`），
+## UI 那边拿它决定开哪个面板；`prompt` 是靠近时屏幕中央那行提示。
+##
+## 【交互链路 —— 这条线不经过 Hub 自己】
+## 玩家按 E → `player._try_interact()` 找最近的可交互物 → `Interactable.interact()`
+## → `Events.hub_interact.emit(kind, self)` → `ui_root._on_hub_interact()` 开面板。
+## 所以这里不需要接 `used` 信号。
 func _add_interactable(kind: String, label: String, prompt: String, pos: Vector2, size: Vector2, accent: Color) -> void:
 	var it := Interactable.new()
 	it.position = pos
 	it.setup(kind, label, prompt, size, accent)
-	it.used.connect(_on_interactable_used)
 	props_layer.add_child(it)
 	interactables.append(it)
 
@@ -107,10 +115,8 @@ func _spawn_camera() -> void:
 
 # ================= 交互 =================
 
-func _on_interactable_used(_p: Node) -> void:
-	pass
-
-
+## 开关玩家的物理与逻辑处理。打开据点面板时会把玩家冻住 ——
+## 否则玩家能在菜单还开着的时候继续走动，又碰到别的交互物叠出第二个面板。
 func set_controls_enabled(v: bool) -> void:
 	if player != null and is_instance_valid(player):
 		player.set_physics_process(v)

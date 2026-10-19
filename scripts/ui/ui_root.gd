@@ -1,15 +1,31 @@
 class_name UIRoot
 extends CanvasLayer
-## 全局 UI：标题 / 据点 HUD / 局内 HUD / 结算，以及据点面板（长椅、改造台、黑市、终端、出击）。
+## 全局 UI 总控：HUD、标题、据点面板、结算、暂停、存档、设置全在这里。
 ##
-## 大部分仍走代码构建（便于 diff 与 headless 校验）；标题页已迁移到
-## `ui/scenes/title.tscn`，由 `ui/scripts/title.gd` 驱动，可单独预览。
+## 【两种构建方式并存】
+## - **代码构建**：HUD、据点面板、结算页（`_build_*()` 系列）。便于 diff 与无头校验。
+## - **场景实例化**：标题页、暂停页、存档栏位、设置界面 —— 各自是独立 .tscn，
+##   在 `ui/scenes/` 下可以单开、也有 `ui/scenes/preview/` 里的假数据预览场景。
+## 新做界面优先走第二种：布局能在编辑器里直接调，还能脱离游戏单独预览。
+##
+## 【层级顺序（后加的盖在上面）】
+## root → hud → 交互提示 → banner → 字幕 → toast
+##      → 据点面板 → 标题 → 存档 → 设置 → 结算 → 三选一 → 暂停
+## 每个 `*_layer` 都是铺满全屏的 Control，靠 `visible` 切换，不做增删。
+##
+## 【Esc 的处理有优先级】见 `_unhandled_input()`：设置 → 存档 → 据点面板 →
+## 暂停面板 → 暂停开关（仅据点/局内）。标题页与结算页按 Esc 不会弹暂停。
+##
+## 【单例依赖】本类会直接调 `Game` / `Sfx` / `Events`。所以它不能像
+## `ui/scripts/title.gd` 那样脱离游戏单独预览 —— 那几个场景通过信号与宿主讲清，
+## 宿主这边才是真正干活的地方。
 
 enum Mode { NONE, TITLE, HUB, RUN, GAMEOVER }
 
 const TITLE_SCENE := preload("res://ui/scenes/title.tscn")
 const PAUSE_SCENE := preload("res://ui/scenes/pause_menu.tscn")
 const ARCHIVE_SCENE := preload("res://ui/scenes/archive.tscn")
+const SETTINGS_SCENE := preload("res://ui/scenes/settings.tscn")
 
 const PANEL_W := 880.0
 const PANEL_H := 540.0
@@ -33,6 +49,7 @@ var toast_box: VBoxContainer
 
 var title_layer: Control
 var archive_layer: Control
+var settings_layer: Control
 var gameover_layer: Control
 var gameover_title: Label
 var gameover_body: VBoxContainer
@@ -43,6 +60,8 @@ var panel_body: VBoxContainer
 var panel_footer: Label
 var panel_kind: String = ""
 var panel_open: bool = false
+## 面板打开时刻（毫秒），用来挡掉「开面板的那次按键」被当成关闭操作。
+var _panel_opened_ms: int = 0
 var reward: RewardChoice = null
 var _boss: Node = null
 
@@ -143,6 +162,7 @@ func _build() -> void:
 	_build_panel()
 	_build_title()
 	_build_archive()
+	_build_settings()
 	_build_gameover()
 	_build_reward()
 	_build_pause()
@@ -240,6 +260,9 @@ func _on_title_action(id: String) -> void:
 		"open_archive":
 			Sfx.play("ui_confirm")
 			show_archive()
+		"open_settings":
+			Sfx.play("ui_confirm")
+			show_settings()
 		"quit_game":
 			Sfx.play("ui_cancel")
 			get_tree().quit()
@@ -300,6 +323,58 @@ func _hide_archive() -> void:
 	archive_layer.visible = false
 	title_layer.visible = true
 	title_layer.call("focus_first")
+
+
+# ================= 游戏设置 =================
+
+func _build_settings() -> void:
+	settings_layer = SETTINGS_SCENE.instantiate()
+	settings_layer.name = "SettingsLayer"
+	settings_layer.visible = false
+	root.add_child(settings_layer)
+	settings_layer.connect("action", _on_settings_action)
+	settings_layer.connect("keybind_changed", _on_keybind_changed)
+	settings_layer.connect("keybind_reset", _on_keybind_reset)
+	settings_layer.connect("hover", func(_id: String) -> void: Sfx.play("ui_move", -8.0))
+
+
+func show_settings() -> void:
+	settings_layer.visible = true
+	settings_layer.call("open_page", 0)
+
+
+func _hide_settings() -> void:
+	settings_layer.visible = false
+	settings_layer.call("close")
+	title_layer.visible = true
+	title_layer.call("focus_first")
+
+
+func _on_settings_action(id: String) -> void:
+	if id == "close":
+		Sfx.play("ui_cancel")
+		_hide_settings()
+
+
+## 玩家绑好了一个新键。`Game.set_keybind()` 会就地改 InputMap 并写盘，
+## 顺带返回被顶掉的那个动作名（有冲突时），这里只用它决定提示文案。
+func _on_keybind_changed(action_id: String, kb: int, mouse: int) -> void:
+	var kicked := Game.set_keybind(action_id, kb, mouse)
+	Sfx.play("ui_confirm")
+	var shown := InputActions.key_name(kb) if kb != 0 else InputActions.mouse_name(mouse)
+	var who := InputActions.display_name(action_id)
+	if kicked != "":
+		Events.toast.emit("「%s」已设为 %s，原绑定从「%s」移除" % [who, shown, InputActions.display_name(kicked)], UITheme.AMBER)
+	else:
+		Events.toast.emit("「%s」已设为 %s" % [who, shown], UITheme.CYAN)
+	settings_layer.call("refresh_keys")
+
+
+func _on_keybind_reset() -> void:
+	Game.reset_keybinds()
+	Sfx.play("ui_deny")
+	Events.toast.emit("按键已恢复默认", UITheme.TEXT_DIM)
+	settings_layer.call("refresh_keys")
 
 
 func _on_archive_action(id: String) -> void:
@@ -378,6 +453,7 @@ func show_title() -> void:
 	mode = Mode.TITLE
 	title_layer.visible = true
 	archive_layer.visible = false
+	settings_layer.visible = false
 	gameover_layer.visible = false
 	panel_layer.visible = false
 	panel_open = false
@@ -431,7 +507,12 @@ func show_gameover(victory: bool, banked: int) -> void:
 	for c in gameover_body.get_children():
 		c.queue_free()
 	gameover_body.add_child(_center_label("带回织网碎片   %d" % banked, 22, UITheme.GOLD))
-	gameover_body.add_child(_center_label("本次下潜   %d 扇区" % (int(Game.stats.get("best_floor", 1))), 17, UITheme.TEXT_DIM))
+	# 这里必须读本局的 floor_index：`stats.best_floor` 是历史最佳，拿它当「本次」会显示成
+	# 玩家从没到过的层数（第一层死掉却显示「本次下潜 3 扇区」）。end_run() 不置空 run，读得到。
+	var floor_no := 1
+	if Game.run != null:
+		floor_no = Game.run.floor_index + 1
+	gameover_body.add_child(_center_label("本次下潜   %d 扇区" % floor_no, 17, UITheme.TEXT_DIM))
 	gameover_body.add_child(_center_label("累计出击   %d 次" % int(Game.stats.get("runs", 0)), 17, UITheme.TEXT_DIM))
 	_release_ui_focus()
 	_focus_first_button()
@@ -472,6 +553,7 @@ func open_panel(kind: String) -> void:
 		return
 	panel_kind = kind
 	panel_open = true
+	_panel_opened_ms = Time.get_ticks_msec()
 	panel_layer.visible = true
 	_set_player_controls(false)
 	Sfx.play("terminal")
@@ -486,10 +568,15 @@ func close_panel() -> void:
 	panel_open = false
 	panel_layer.visible = false
 	Sfx.play("ui_cancel")
-	_set_player_controls(true)
 	_release_ui_focus()
 	Events.hub_panel_closed.emit(panel_kind)
 	panel_kind = ""
+	# 恢复玩家控制要延后一点：关闭用的那次按键此刻还按着，
+	# 立刻恢复会被玩家当成「再次交互」，面板刚关就又打开了。
+	get_tree().create_timer(0.22).timeout.connect(func() -> void:
+		if not panel_open:
+			_set_player_controls(true)
+	)
 
 
 func _set_player_controls(v: bool) -> void:
@@ -1225,6 +1312,22 @@ func _process(delta: float) -> void:
 		subtitle_label.modulate.a = maxf(0.0, subtitle_label.modulate.a - delta * 2.5)
 
 	_update_interact_hint()
+	_poll_panel_close()
+
+
+## 交互键（E）再按一次关面板。
+##
+## 用轮询而不是 `InputEvent`：玩家打开面板走的就是 `Input.is_action_just_pressed`
+## 这条轮询路径，关掉它用同一套机制最一致；手柄 B 键、注入输入也都能吃到，
+## 不受「事件能不能匹配 physical_keycode」影响。
+## 刚打开的那 180ms 内忽略，避免「开面板的那次按键顺手又把面板关了」。
+func _poll_panel_close() -> void:
+	if not panel_open:
+		return
+	if Time.get_ticks_msec() - _panel_opened_ms < 180:
+		return
+	if Input.is_action_just_pressed("interact"):
+		close_panel()
 
 
 func _on_boss_started(boss: Node) -> void:
@@ -1258,13 +1361,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	if reward != null and reward.is_open():
 		return
 
-	# Esc：面板打开时先关面板，否则开关暂停
+	# Esc：按层级从外到里逐层关闭 —— 设置 / 存档界面 → 据点面板 → 暂停。
+	# 每一层都能用同一个键退掉，不用去找按钮。
 	if event.is_action_pressed("pause"):
-		if panel_open:
+		if settings_layer.visible:
+			_hide_settings()
+		elif archive_layer.visible:
+			_hide_archive()
+		elif panel_open:
 			close_panel()
 		elif paused:
 			set_paused(false)
-		else:
+		elif mode == Mode.HUB or mode == Mode.RUN:
 			toggle_pause()
 		get_viewport().set_input_as_handled()
 		return

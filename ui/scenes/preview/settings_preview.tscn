@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://bsx7qwy2nkmva"]
+
+[ext_resource type="Script" uid="uid://dmgdoa72hac4t" path="res://ui/scripts/settings_preview.gd" id="1_setpv"]
+[ext_resource type="PackedScene" uid="uid://dxyfbtikxoyfo" path="res://ui/scenes/settings.tscn" id="2_setbg"]
+
+[node name="SettingsPreview" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_setpv")
+
+[node name="Bg" type="ColorRect" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.039215688, 0.043137256, 0.0627451, 1)
+
+[node name="SettingsLayer" parent="." instance=ExtResource("2_setbg")]
+layout_mode = 1
+grow_horizontal = 2
+grow_vertical = 2

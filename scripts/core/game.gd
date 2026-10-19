@@ -1,8 +1,26 @@
 extends Node
 ## 全局游戏管理（Autoload: Game）
 ##
-## 负责：输入映射注册、元进度与存档、当前这一局（RunState）的生命周期、
-## 难度倍率、全局打击停顿（hitstop）。具体关卡与 UI 由 Main 场景驱动。
+## 【一句话】跨局存活的东西都放在这里：存档、永久升级、难度、统计。
+## 单局内的数据在 `RunState` 里，本对象只负责「开局」与「结算」这两端的生命周期。
+##
+## 【三个存档文件，各管一摊】
+## 1. `user://cage_save.json`      —— 据点元进度：永久升级、碎片/盲区币存款、
+##                                    黑市待生效补给、统计、情报解锁。一有变动就自动写盘。
+## 2. `user://cage_run.json`       —— 局内续关存档。每进一个新房间静默写一次（auto），
+##                                    暂停菜单手动保存时覆盖成精确位置（manual）。
+## 3. `user://cage_slot_1..5.json` —— 五个手动栏位，是 cage_run.json 的备份副本。
+##                                    只备份局内进度，**不碰**元进度 ——
+##                                    读栏位不会把永久升级或碎片存款回滚。
+## 另有 `cage_save_selfcheck.json`：无头自检专用沙盒，避免自检污染玩家存档。
+##
+## 【一局的生命周期】
+## `start_run()` 开一局 → RunState 存活 → `end_run()` / `abandon_run()` 结算 → 回据点。
+## 结算时算出 `shards_banked`（真正带回据点的碎片），其余一律丢弃。
+##
+## 【本对象不做的事】
+## 不管关卡生成（`level.gd`）、不管界面（`ui_root.gd`）、不管玩家与敌人。
+## 它只是一个数据中枢：存档读写 + 几个全局倍率 + 打击停顿。
 
 enum Difficulty { ASSIST, NORMAL, HARD, OFFLINE }
 
@@ -15,6 +33,14 @@ const SAVE_VERSION := 1
 const SAVE_PATH_SANDBOX := "user://cage_save_selfcheck.json"
 
 ## 据点永久升级（消耗织网碎片）。数值刻意保守，避免永久成长压过局内构筑。
+##
+## 每个条目的字段含义：
+## - `max`       ：最多能买几级，买满后按钮变灰
+## - `cost_base` ：第 1 级的价格
+## - `cost_step` ：之后每级递增多少；为 0 表示只有一级（如「重启协议」）
+## - `icon`      ：界面上的图标分类，纯装饰
+## 实际的加成数值不写在这里，而是写在 `RunState.recalc()` 里按等级线性叠加 ——
+## 因为永久升级和局内词条必须汇进同一张属性表，否则加成会打架。
 const META_UPGRADES := {
 	"shell_hp":         {"name": "外壳扩容", "desc": "最大耐久 +10", "max": 10, "cost_base": 60, "cost_step": 45, "icon": "shell"},
 	"energy_cap":       {"name": "锚定核扩容", "desc": "幽灵能量上限 +5", "max": 8, "cost_base": 70, "cost_step": 55, "icon": "ghost"},
@@ -28,6 +54,11 @@ const META_UPGRADES := {
 }
 
 ## 安全屋黑市（消耗盲区币）。买到的东西存在 pending_boons 里，下一局开局结算。
+##
+## 和改造台的分工：
+## - 改造台：花**织网碎片**，买**永久**升级，跨局一直有效。
+## - 黑市　：花**盲区币**，买**下一局一次性**补给，开局兑现后即清空。
+## 因为买完只是进 `pending_boons`、还没兑现，所以随时可以退款（`refund_shop`）。
 const SHOP_ITEMS := {
 	"repair_kit":  {"name": "修理包", "desc": "下一局开局携带 1 个修理包", "price": 60, "icon": "util"},
 	"battery":     {"name": "护盾电池", "desc": "下一局开局携带 1 个护盾电池", "price": 85, "icon": "shield"},
@@ -43,7 +74,9 @@ var meta_upgrades: Dictionary = {}
 var stats: Dictionary = {"runs": 0, "kills": 0, "deaths": 0, "best_floor": 0, "wins": 0, "playtime": 0.0}
 var intel_seen: Array[String] = []       # 已解锁的记忆残页 / 情报
 var difficulty: int = Difficulty.NORMAL
-var settings: Dictionary = {"master_volume": 0.85, "shake": 1.0, "damage_numbers": true, "screenshake_enabled": true}
+## 玩家偏好。`keybinds` 只存**改过**的动作（没改的走 InputActions.BINDINGS 默认值），
+## 所以「恢复默认」就是把这个键清空。
+var settings: Dictionary = {"master_volume": 0.85, "shake": 1.0, "damage_numbers": true, "screenshake_enabled": true, "keybinds": {}}
 
 ## 当前这一局
 var run: RunState = null
@@ -63,6 +96,60 @@ func _ready() -> void:
 		save_path = SAVE_PATH_SANDBOX
 		print("[Game] 自检模式：存档切到 %s（玩家存档 %s 不动）" % [save_path, SAVE_PATH])
 	load_meta()
+	# 玩家自定义按键在存档读进来之后才生效 —— load_meta() 会把 keybinds 一起读出来。
+	apply_keybinds()
+
+
+## 把 settings["keybinds"] 应用到 InputMap。存档读入、改键、恢复默认之后都要调。
+func apply_keybinds() -> void:
+	var custom = settings.get("keybinds", {})
+	InputActions.apply_custom(custom if typeof(custom) == TYPE_DICTIONARY else {})
+
+
+## 改一个动作的绑定。`kb` / `mouse` 传 0 表示这类不放键。
+##
+## 冲突处理：如果这个键已经被别的可重绑动作占用，就**把对方清回空绑定**
+## 并返回对方动作名，让界面能提示一句「已从 XX 移除」。没冲突返回空串。
+## 注意允许「同键多绑」是刻意设计的 —— 比如跳跃同时绑空格和 W，玩家可能想要。
+func set_keybind(action: String, kb: int, mouse: int) -> String:
+	if not InputActions.REBINDABLE.has(action):
+		return ""
+	var conflict := InputActions.find_conflict(action, kb, mouse)
+	if conflict != "":
+		var binds: Dictionary = settings.get("keybinds", {})
+		binds.erase(conflict)
+		settings["keybinds"] = binds
+		apply_keybinds()          # 先把冲突方恢复成默认，下面再覆盖本动作
+
+	var binds2: Dictionary = settings.get("keybinds", {})
+	var entry := {"kb": [], "mouse": []}
+	if kb != 0:
+		entry["kb"] = [kb]
+	if mouse != 0:
+		entry["mouse"] = [mouse]
+	binds2[action] = entry
+	settings["keybinds"] = binds2
+	apply_keybinds()
+	save_meta()
+	return conflict
+
+
+## 清掉某个动作的自定义，回到默认绑定。
+func clear_keybind(action: String) -> void:
+	var binds: Dictionary = settings.get("keybinds", {})
+	if not binds.has(action):
+		return
+	binds.erase(action)
+	settings["keybinds"] = binds
+	apply_keybinds()
+	save_meta()
+
+
+## 恢复全部默认按键。
+func reset_keybinds() -> void:
+	settings["keybinds"] = {}
+	apply_keybinds()
+	save_meta()
 
 
 ## 当前是否是自检 / 截图运行。
@@ -113,6 +200,16 @@ func load_meta() -> void:
 		for item in intel:
 			intel_seen.append(str(item))
 
+	# 玩家偏好（音量、震屏、自定义按键）。旧存档没有这一段，保持默认值即可。
+	var st2 = data.get("settings", {})
+	if typeof(st2) == TYPE_DICTIONARY:
+		for key in settings.keys():
+			if st2.has(key) and key != "keybinds":
+				settings[key] = st2[key]
+		var kb2 = st2.get("keybinds", {})
+		if typeof(kb2) == TYPE_DICTIONARY:
+			settings["keybinds"] = kb2.duplicate(true)
+
 
 func save_meta() -> void:
 	var data := {
@@ -124,6 +221,7 @@ func save_meta() -> void:
 		"meta_upgrades": meta_upgrades,
 		"stats": stats,
 		"intel_seen": intel_seen,
+		"settings": settings,
 	}
 	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f == null:
@@ -356,6 +454,14 @@ func buy_meta(key: String) -> bool:
 
 
 # ================= 难度 =================
+#
+# 四个难度只调三个数，都不碰玩法规则本身：
+# - `enemy_hp_mult()`        敌人血量倍率
+# - `enemy_damage_mult()`    敌人伤害倍率
+# - `drop_ratio()`           死亡时按这个比例先扣掉一部分碎片（越高越狠）
+# 「断网」额外把污染积累速度 ×1.15，是四者里唯一带特殊规则的。
+#
+# 注意：这里返回的是**倍率**（1.0 = 不变），调用方直接乘，不要再 +1。
 
 func difficulty_name() -> String:
 	match difficulty:
@@ -398,6 +504,13 @@ func pollution_gain_mult() -> float:
 
 
 # ================= 局（run）生命周期 =================
+#
+# 开局的顺序很重要，改这里之前先看清楚：
+#   1. 作废旧续关存档（否则「继续本局」会把玩家拉回上一局）
+#   2. new RunState —— 构造函数里就会 recalc() 一次，属性表此时已有永久升级加成
+#   3. 兑现「暗格权限」送的开局词条（要放在 recalc 之后，否则会被重算覆盖）
+#   4. 兑现黑市补给（pending_boons）
+#   5. 统计 +1 次出击，然后广播 run_started
 
 func start_run(p_seed: int = 0) -> RunState:
 	# 开新局 = 旧的续关存档作废，免得「继续本局」把玩家拉回上一局
@@ -473,6 +586,13 @@ func refund_shop(key: String) -> bool:
 	return true
 
 
+## 结算并清掉续关存档，返回真正带回据点的碎片数。
+##
+## 三种结局走的路径不同：
+## - `end_run(true)`   通关：碎片全带回去，wins +1
+## - `end_run(false)`  死亡：先按难度扣掉 `drop_ratio()` 那一份，再带 55% 回去，deaths +1
+## - `abandon_run()`   从暂停菜单放弃：**不结算**，只把已经 banked 的部分入库
+## 注意 `end_run` 不会把 `run` 置空 —— 结算界面还要读它。置空由 `finish_run_to_hub()` 负责。
 func end_run(victory: bool) -> int:
 	clear_run_save()
 	if run == null:
@@ -501,6 +621,7 @@ func finish_run_to_hub(victory: bool) -> int:
 	return banked
 
 
+## 从暂停菜单「放弃本局游戏」进来：不结算本次收益，但把已经入库的那部分碎片留下。
 func abandon_run() -> void:
 	clear_run_save()
 	if run != null:

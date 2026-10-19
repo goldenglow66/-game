@@ -64,6 +64,20 @@ func accent() -> Color:
 
 
 # ================= 生成 =================
+#
+# 【一个扇区是怎么长出来的】
+#   1. `_roll_layout()`    决定房间序列：固定「入口」开头、「核心（Boss）」结尾，
+#                          中间 4~6 间从池子里抽（战斗/精英/事件/奖励/休整/商店）
+#   2. 逐间给宽度（`_room_width`，按类型给不同区间），x 坐标首尾相接排成一条长走廊
+#   3. 每间房放三层平台、地面/天花板碰撞、敌人生成点
+#   4. `_fill_room_contents()` 按房间类型排班「放几只什么怪」
+#   5. `_build_gates()`    在房间之间立闸门（清空才开）
+#
+# 【为什么不用 TileMap】全部几何都是 `_draw()` 画矩形 + 静态箱体碰撞，
+# 没有贴图资源 —— 好处是改配色/改尺寸只动代码，坏处是视觉细节做不细。
+#
+# 【关键约定】所有随机都必须走传进来的 `p_rng`（由 `RunState.rng` 播种），
+# 不要用全局 `randi()`，否则同一个种子就复现不出同一张图了。
 
 func generate(p_floor: int, p_rng: RandomNumberGenerator) -> void:
 	floor_index = p_floor
@@ -106,6 +120,10 @@ func generate(p_floor: int, p_rng: RandomNumberGenerator) -> void:
 	queue_redraw()
 
 
+## 抽房间序列。返回的类型数组第一个是 START、最后一个是 BOSS。
+##
+## 中间间的规则：纯随机抽，但**连续两个功能房会被强制插一个战斗房** ——
+## 否则可能抽出一串「商店→休整→事件」，整层没有仗打。
 func _roll_layout() -> Array[int]:
 	var kinds: Array[int] = []
 	kinds.append(Room.Kind.START)

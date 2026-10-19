@@ -1,8 +1,22 @@
 extends Node2D
 ## 游戏主控（Main.tscn 根节点）。
 ##
-## 只负责在「标题 / 安全屋 / 一局战斗 / 结算」之间切换，并把环境背景、世界层、UI 层分开。
-## 具体玩法都在 Hub、RunWorld、Player、Level 内实现，主控不参与战斗逻辑。
+## 【它是什么】一个四状态的屏幕管理器：标题 / 安全屋 / 一局战斗 / 结算。
+## 切屏时它负责拆掉旧世界、建出新世界、通知 UI 换模式。
+##
+## 【它不是什么】不参与任何战斗逻辑。玩家、敌人、关卡、UI 都是各自独立的脚本，
+## 主控只是把它们拼起来并决定谁在场。
+##
+## 【三个孩子，各占一层】
+## - `BackgroundLayer`（CanvasLayer, layer=-10）：雨幕霓虹氛围背景，不随相机移动
+## - `World`（Node2D）：当前世界的实体，暂停时会一起停
+## - `UIRoot`（CanvasLayer）：HUD 与所有界面，暂停时仍可交互
+##
+## 【命令行模式】
+## `_ready()` 末尾会检查 `--` 之后的参数，如果带了自检开关就进对应模式并退出。
+## 这些模式是**无头验证**用的（`godot --headless --path . --selfcheck`），
+## 平时玩不会走这里。每个自检都在自己的区块里说明它验什么。
+## 唯一例外是 `--shot`：它用真实渲染器跑一遍并存 PNG，用于确认画面没画崩。
 
 enum Screen { TITLE, HUB, RUN, GAMEOVER }
 
@@ -29,6 +43,10 @@ func _force_fullscreen() -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
 
 
+## 启动流程：锁全屏 → 注册单例引用 → 建三层 → 进标题页 → 看有没有自检参数。
+##
+## 注意 `process_mode = PROCESS_MODE_ALWAYS`：主控自身永远运行（否则暂停时切屏代码也停了），
+## 而 `world_root` 被单独压成 `PROCESS_MODE_PAUSABLE` —— 这样暂停时世界停、UI 与主控继续跑。
 func _ready() -> void:
 	_force_fullscreen()
 	Game.main = self
@@ -85,6 +103,8 @@ func _ready() -> void:
 # ================= 截图（--shot） =================
 #
 # 用真实渲染器跑一遍并把关键画面存成 PNG，用于在没有人工肉眼的情况下确认画面没画崩。
+# 用法：godot --path . -- --shot
+# 输出目录见 SHOT_DIR。它是唯一一个「会真的渲染」的自检模式，其余都是无头逻辑验证。
 
 const SHOT_DIR := "C:/Users/Lenovo/Desktop/gamemake/_shots"
 
@@ -1033,6 +1053,18 @@ func _run_mapcheck() -> void:
 
 
 # ================= 屏幕切换 =================
+#
+# 【统一套路】每个 goto_* 都是同一套三步：
+#   1. `_clear_world()` —— 拆掉旧世界（顺便把暂停与 time_scale 复位）
+#   2. 设 `screen` 与构建新世界，挂到 `world_root` 下
+#   3. 通知 UI 换模式（`ui.show_title()` / `ui.show_hud()` / …）
+# 新增一个屏幕时照这个顺序抄，别漏第 3 步 —— 否则 UI 会停在上一屏。
+#
+# 【run 的所有权】`Game.run` 是单例字段，不归世界所有。
+# - `begin_run()`   由 `Game.start_run()` 新建
+# - `resume_run()`  由 `Game.prepare_resume()` 从存档重建
+# - `goto_hub()`    显式置 null（此时已结算完毕）
+# 忘了置 null 的话，据点里会残留上一局的构筑，HUD 也会显示错的数值。
 
 func _clear_world() -> void:
 	for child in world_root.get_children():

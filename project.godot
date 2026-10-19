@@ -28,16 +28,10 @@ Sfx="*res://scripts/core/sfx.gd"
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
-; 锁定全屏：4 = Exclusive Fullscreen（独占全屏）。3 = Fullscreen 是
-; 「无边框窗口」，Windows 任务栏会浮在画面之上；独占全屏才真正接管显示器。
 window/size/mode=4
 window/size/resizable=false
-; viewport：整幅画面按 1280x720 渲染后统一缩放，窗口尺寸变化时
-; Control 布局不用逐帧重算，拖窗/缩放明显更跟手。
 window/stretch/mode="viewport"
-; expand：画面按比例扩展到填满整块屏幕，不留黑边。
 window/stretch/aspect="expand"
-; 拖动窗口时 Windows 会进入 modal move loop，同步等待垂直同步会让画面明显滞后。
 window/vsync/vsync_mode=0
 
 [dotnet]
@@ -62,8 +56,6 @@ project/assembly_name="笼中墟影 - Ghost in the Iron Shell"
 
 [rendering]
 
-; 2D 横板用 OpenGL 后端：启动快、显存占用低，Windows 下窗口交互也更稳。
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-anti_aliasing/quality/msaa_2d=1
 environment/defaults/default_clear_color=Color(0.043, 0.047, 0.066, 1)

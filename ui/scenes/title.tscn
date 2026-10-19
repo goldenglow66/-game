@@ -140,10 +140,66 @@ text = "游 戏 存 档"
 [node name="BtnSettings" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=949929043]
 layout_mode = 2
 size_flags_horizontal = 3
-disabled = true
 text = "游 戏 设 置"
 
 [node name="BtnWipe" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=32982494]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "退 出 游 戏"
+
+[node name="ConfirmLayer" type="Control" parent="." unique_id=750385824]
+visible = false
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="ConfirmDim" type="ColorRect" parent="ConfirmLayer" unique_id=814906387]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.02, 0.02, 0.03, 0.72)
+
+[node name="ConfirmCenter" type="CenterContainer" parent="ConfirmLayer" unique_id=578414679]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="ConfirmPanel" type="PanelContainer" parent="ConfirmLayer/ConfirmCenter" unique_id=770494853]
+custom_minimum_size = Vector2(470, 0)
+layout_mode = 2
+
+[node name="ConfirmMargin" type="MarginContainer" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel" unique_id=1357517268]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="ConfirmVBox" type="VBoxContainer" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin" unique_id=456609141]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ConfirmTitle" type="Label" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox" unique_id=611607016]
+layout_mode = 2
+text = "放 弃 本 局 游 戏？"
+
+[node name="ConfirmBody" type="Label" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox" unique_id=752102014]
+layout_mode = 2
+text = "当前这一局的进度会全部丢失，无法恢复。
+已存入存档栏位的备份不受影响。"
+autowrap_mode = 3
+
+[node name="ConfirmRow" type="HBoxContainer" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox" unique_id=1612266258]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 2
+
+[node name="BtnConfirm" type="Button" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmRow" unique_id=19985559]
+custom_minimum_size = Vector2(132, 36)
+layout_mode = 2
+text = "确 认 放 弃"
+
+[node name="BtnCancel" type="Button" parent="ConfirmLayer/ConfirmCenter/ConfirmPanel/ConfirmMargin/ConfirmVBox/ConfirmRow" unique_id=1923556501]
+custom_minimum_size = Vector2(132, 36)
+layout_mode = 2
+text = "取 消"

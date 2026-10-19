@@ -105,9 +105,9 @@ func _apply_resume() -> void:
 			_resume_room_index = room_index
 			return
 
-	# auto：从房间入口开始
+	# auto：从房间入口开始。房间坐标是 level 局部的，必须转成世界坐标再用。
 	if target != null:
-		player.global_position = Vector2(target.x_start + 180.0, target.floor_y - 40.0)
+		player.global_position = level.to_global(Vector2(target.x_start + 180.0, target.floor_y - 40.0))
 		_resume_room_index = target.index
 
 
@@ -149,18 +149,29 @@ func _build_sector() -> void:
 
 # ================= 房间推进 =================
 
+## 玩家在 level 坐标系里的位置。
+##
+## 房间边界（`room.x_start` / `level.total_width`）都是 level 的**局部**坐标，而
+## `player.global_position` 是世界坐标；`World` 容器本身带一点偏移，两者直接比会差一段距离。
+## 差这几十像素的后果很具体：人还没真正踏进房间，就被判定成「已进入」→ 前后闸门一起关上，
+## 而玩家此刻恰好站在门的这一侧，于是被永久挡在房间外，怪打不到、房间清不掉、整局卡死。
+func _player_level_pos() -> Vector2:
+	return level.to_local(player.global_position)
+
+
 func _physics_process(_delta: float) -> void:
 	if _transitioning or player == null or not is_instance_valid(player) or level == null:
 		return
 
-	var r := level.room_at(player.global_position.x)
+	var lpos := _player_level_pos()
+	var r := level.room_at(lpos.x)
 	if r != null and r != _current_room:
 		_enter_room(r)
 
 	_check_room_cleared()
 
 	# 走到扇区尽头 → 下潜一层。但 Boss 房右边没有闸门，所以必须用「本层 Boss 是否已倒下」把关
-	if player.global_position.x > level.total_width - 90.0:
+	if lpos.x > level.total_width - 90.0:
 		var last: Room = null
 		if not level.rooms.is_empty():
 			last = level.rooms[level.rooms.size() - 1]
@@ -170,11 +181,21 @@ func _physics_process(_delta: float) -> void:
 			_remind_boss_gate()
 
 	# 掉出世界 → 拉回
-	if player.global_position.y > 400.0:
-		player.global_position = Vector2(ROOM_MARGIN, -60.0)
+	if lpos.y > 400.0:
+		player.global_position = level.to_global(Vector2(ROOM_MARGIN, -60.0))
 		player.velocity = Vector2.ZERO
 
 
+## 玩家踏进一个房间时的**唯一入口** —— 房间的一切状态变化都从这里发起。
+##
+## 分两种情况：
+## - 有怪且没清过（战斗/精英/Boss）：关前后闸门，刷怪。清完后 `_check_room_cleared()` 会开门。
+## - 其他：直接开门，并按类型落地内容（奖励房发三选一、商店/休整落地终端、事件房落信号源）。
+##
+## 末尾的自动存档是「非正常退出的回退点」：每进一个新房间静默写一次房间入口，
+## 玩家直接关窗口后再开，就从这间房的门口开始。
+## `_resume_room_index` 那一次必须跳过 —— 那是读档恢复本身触发的，存下去会把
+## 刚恢复的精确坐标覆盖成房间入口。
 func _enter_room(r: Room) -> void:
 	_current_room = r
 	r.entered = true
@@ -356,6 +377,11 @@ func _too_close(list: Array[Vector2], p: Vector2) -> bool:
 	return false
 
 
+## 每次有敌人死亡时调用：清掉已死的引用，若全清空了就结算这间房。
+##
+## 结算动作按顺序：标记已清 → 累计计数 → 开前后门 → 播音效与提示 → 发奖励。
+## 注意 `_active_enemies` 里存的是节点引用，敌人被 `queue_free()` 后要先用
+## `is_instance_valid()` 过滤，否则遍历时会访问已释放的对象。
 func _check_room_cleared() -> void:
 	var r := _current_room
 	if r == null or r.cleared or r.spawn_count <= 0:

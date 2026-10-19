@@ -1,0 +1,101 @@
+[gd_scene format=3 uid="uid://dxyfbtikxoyfo"]
+
+[ext_resource type="Script" uid="uid://dojhqasm5b55" path="res://ui/scripts/settings.gd" id="1_vasmm"]
+
+[node name="SettingsLayer" type="Control" unique_id=1881680793]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_vasmm")
+
+[node name="SettingsBody" type="Control" parent="." unique_id=1779557021]
+visible = false
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Dim" type="ColorRect" parent="SettingsBody" unique_id=1740034441]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.02, 0.02, 0.03, 0.9)
+
+[node name="ContentPanel" type="PanelContainer" parent="SettingsBody" unique_id=1647958447]
+layout_mode = 0
+offset_left = 120.0
+offset_top = 90.0
+offset_right = 1160.0
+offset_bottom = 575.0
+
+[node name="ContentMargin" type="MarginContainer" parent="SettingsBody/ContentPanel" unique_id=1570072093]
+layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 24
+
+[node name="ContentVBox" type="VBoxContainer" parent="SettingsBody/ContentPanel/ContentMargin" unique_id=698272805]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="ContentHead" type="HBoxContainer" parent="SettingsBody/ContentPanel/ContentMargin/ContentVBox" unique_id=2039818082]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="HeadBar" type="ColorRect" parent="SettingsBody/ContentPanel/ContentMargin/ContentVBox/ContentHead" unique_id=1782534125]
+custom_minimum_size = Vector2(4, 26)
+layout_mode = 2
+
+[node name="ContentTitle" type="Label" parent="SettingsBody/ContentPanel/ContentMargin/ContentVBox/ContentHead" unique_id=2050614548]
+layout_mode = 2
+text = "按 键 设 置"
+
+[node name="ContentDivider" type="HSeparator" parent="SettingsBody/ContentPanel/ContentMargin/ContentVBox" unique_id=796339386]
+layout_mode = 2
+
+[node name="ContentBody" type="MarginContainer" parent="SettingsBody/ContentPanel/ContentMargin/ContentVBox" unique_id=1898355611]
+layout_mode = 2
+
+[node name="BodyVBox" type="VBoxContainer" parent="SettingsBody/ContentPanel/ContentMargin/ContentVBox/ContentBody" unique_id=1496510708]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BodyHint" type="Label" parent="SettingsBody/ContentPanel/ContentMargin/ContentVBox/ContentBody/BodyVBox" unique_id=721988014]
+layout_mode = 2
+text = "这里放具体设置项"
+
+[node name="TabBar" type="HBoxContainer" parent="SettingsBody" unique_id=1753863329]
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 160.0
+offset_top = -200.0
+offset_right = -160.0
+offset_bottom = -120.0
+theme_override_constants/separation = 40
+
+[node name="BtnKeys" type="Button" parent="SettingsBody/TabBar" unique_id=892810726]
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "按 键 设 置"
+
+[node name="BtnAudio" type="Button" parent="SettingsBody/TabBar" unique_id=1701677035]
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "音 量 设 置"
+
+[node name="BtnVideo" type="Button" parent="SettingsBody/TabBar" unique_id=507943906]
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "画 面 设 置"
+
+[node name="BtnQuit" type="Button" parent="SettingsBody/TabBar" unique_id=97828669]
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "退 出 设 置"
