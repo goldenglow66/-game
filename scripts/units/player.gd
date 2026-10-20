@@ -135,10 +135,11 @@ func emit_vitals() -> void:
 #   4. `_tick_timers()`     土狼时间、跳跃缓冲、体力回复延迟
 #   5. `_read_input()`      读输入并派发动作（跳跃/冲刺/挥剑/格挡/射击/探测/交互）
 #   6. `_apply_physics()`   重力、加速、摩擦
-#   7. `_update_vitals()`   热量与姿态的回复
-#   8. `_update_interactable()` 找最近的可交互物，供 UI 显示提示
-#   9. `_update_hack()`     骇入进度推进
-#  10. `move_and_slide()`   真正移动
+#   7. `_try_step_up()`     小台阶自动抬脚（见函数注释）
+#   8. `_update_vitals()`   热量与姿态的回复
+#   9. `_update_interactable()` 找最近的可交互物，供 UI 显示提示
+#  10. `_update_hack()`     骇入进度推进
+#  11. `move_and_slide()`   真正移动
 #
 # 【状态机的两条线】
 # - `action` 是**互斥动作**（挥剑/冲刺/盾击/受击），同一时刻只能有一个
@@ -166,7 +167,14 @@ func _physics_process(delta: float) -> void:
 	_update_interactable()
 	_update_hack(delta)
 
+	# 记下这一帧想往哪走：撞墙后 velocity.x 会被清零，事后再读就分不清
+	# 「玩家推着墙」还是「玩家松手了」。
+	var want_dir := signf(velocity.x)
 	move_and_slide()
+	# 贴着墙却还想走 → 试试是不是个小台阶。
+	# 放在 move_and_slide 之后：那时 is_on_wall() 才准，velocity 也已经被墙吃掉。
+	if want_dir != 0.0 and is_on_wall():
+		_try_step_up(want_dir)
 
 	var on_floor := is_on_floor()
 	if on_floor and not _was_on_floor:
@@ -175,6 +183,33 @@ func _physics_process(delta: float) -> void:
 	if on_floor:
 		dash_air_used = false
 	queue_redraw()
+
+
+# ---- 小台阶自动攀爬 ----
+const STEP_HEIGHT := 18.0     ## 能自动跨过的最大台阶高度（像素）
+const STEP_PROBE := 8.0       ## 探测前方的距离
+
+
+## 小台阶自动攀爬。dir 是玩家这一帧想走的方向（±1）。
+##
+## CharacterBody2D 的 move_and_slide 不会自动上台阶：地面只要有几个像素的高差，
+## 横向就会被人挡住，手感上就是「一个不起眼的小坎，走过去卡住不动」。
+## 这里在撞墙之后探一次：前方仍然被挡 → 抬高后不撞头、且抬上去之后前方能过 →
+## 直接把身体抬上去。平地行走零开销（不在墙上就不会调到这里）。
+func _try_step_up(dir: float) -> void:
+	if not is_on_floor():
+		return
+	var step := Vector2(dir * STEP_PROBE, 0.0)
+	if not test_move(global_transform, step):
+		return
+	var lift := Vector2(0.0, -STEP_HEIGHT)
+	# 头顶有东西就别抬了，会把人塞进天花板。
+	if test_move(global_transform, lift):
+		return
+	# 抬上去之后前方还得能过，否则只是换个地方卡着。
+	if test_move(global_transform.translated(lift), step):
+		return
+	global_position += lift
 
 
 func _tick_action(delta: float) -> void:
@@ -992,9 +1027,14 @@ func _draw() -> void:
 	var hand := Vector2(6.0 * f, -30.0 + crouch + bob)
 	if charging:
 		draw_circle(hand + Vector2(8.0 * f, 6.0), 8.0 + charge_t * 10.0, Color(UITheme.AMBER.r, UITheme.AMBER.g, UITheme.AMBER.b, 0.12 + 0.2 * (charge_t / CHARGE_MAX)))
+	# 剑刃长度跟着这一段的判定距离走。
+	# 以前固定 40（重击 54），而判定 reach 从 46 一路涨到 60 / 78，
+	# 于是越到后段「打得到但剑尖够不着」，看起来就是判定比攻击距离长。
+	var reach_now := float(current_swing.get("reach", 46.0))
 	var blade_len := 40.0
-	if bool(current_swing.get("heavy", false)) and action == "attack":
-		blade_len = 54.0
+	if reach_now > 0.0:
+		# 剑根在 hand（x 偏移 6），所以刃长 = reach − 6 时剑尖正好压在判定边界上。
+		blade_len = clampf(reach_now - 6.0, 40.0, 96.0)
 	var tip := hand + Vector2(cos(swing_angle), sin(swing_angle)) * blade_len * f
 	var blade_col := UITheme.AMBER if charging else glow
 	draw_line(hand, tip, Color(edge.r, edge.g, edge.b, alpha * 0.8), 3.0)

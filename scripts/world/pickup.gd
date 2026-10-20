@@ -17,17 +17,29 @@ var _vel := Vector2.ZERO
 var _picked: bool = false
 var _player: Node2D = null
 var _shape: CollisionShape2D
+## setup() 里记住的目标位置，等 _ready() 进了场景树再真正落位。
+var _spawn_pos: Vector2 = Vector2.ZERO
+## 落地高度（全局 Y）。以前这里硬编码 120.0，但 World 容器本身带偏移，
+## 地板顶面的全局高度根本不是 120，结果掉落物全部沉到地板底下。
+## 现在由生成方把自己脚下那层的高度传进来。
+var ground_y: float = 120.0
 
 
-func setup(p_kind: String, p_value: int, p_color: Color, pos: Vector2) -> void:
+func setup(p_kind: String, p_value: int, p_color: Color, pos: Vector2, p_ground_y: float = 120.0) -> void:
 	kind = p_kind
 	value = p_value
 	tint = p_color
-	global_position = pos
+	# 注意：调用方是「先 setup 再 add_child」，这时候节点还没进场景树，
+	# 对不在树里的 Node2D 设 global_position 等同于设局部坐标。
+	# 父节点（Enemies）挂在带偏移的 World 下，直接设就会整体偏出去。
+	# 所以先存着，_ready() 时再赋值。
+	_spawn_pos = pos
+	ground_y = p_ground_y
 	_vel = Vector2(randf_range(-70.0, 70.0), randf_range(-220.0, -120.0))
 
 
 func _ready() -> void:
+	global_position = _spawn_pos
 	collision_layer = 0
 	collision_mask = 2
 	monitoring = true
@@ -53,8 +65,8 @@ func _physics_process(delta: float) -> void:
 	_vel.y = minf(700.0, _vel.y + 1500.0 * delta)
 	_vel.x = move_toward(_vel.x, 0.0, 500.0 * delta)
 	global_position += _vel * delta
-	if global_position.y > 120.0:
-		global_position.y = 120.0
+	if global_position.y > ground_y:
+		global_position.y = ground_y
 		_vel.y = 0.0
 		_vel.x = move_toward(_vel.x, 0.0, 900.0 * delta)
 

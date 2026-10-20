@@ -46,6 +46,30 @@ func prompt() -> String:
 	return prompt_text
 
 
+## 增益掉落物的画法：悬浮菱形晶体 + 稀有度光环 + 地面光圈。
+## 占位图形，等有美术素材再换成贴图。
+func _draw_reward(c: Color, pulse: float) -> void:
+	var bob := sin(_glow_t * 3.0) * 3.0
+	var cy := -34.0 + bob
+	# 外层光晕
+	draw_circle(Vector2(0.0, cy), 24.0, Color(c.r, c.g, c.b, 0.10 + 0.10 * pulse))
+	# 菱形晶体
+	var pts := PackedVector2Array([
+		Vector2(0.0, cy - 14.0), Vector2(9.0, cy), Vector2(0.0, cy + 14.0), Vector2(-9.0, cy),
+	])
+	draw_colored_polygon(pts, Color(c.r, c.g, c.b, 0.9))
+	draw_polyline(pts + PackedVector2Array([pts[0]]), c.lightened(0.6), 1.8)
+	# 地面光圈（压扁的椭圆）
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.32))
+	draw_arc(Vector2(0.0, 0.0), 30.0, 0.0, TAU, 24, Color(c.r, c.g, c.b, 0.22 + 0.14 * pulse), 2.0)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# 顶端指示三角，告诉玩家这里有东西可捡
+	var ty := cy - 26.0 - 2.0 * pulse
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(-5.0, ty), Vector2(5.0, ty), Vector2(0.0, ty + 8.0),
+	]), Color(c.r, c.g, c.b, 0.8 + 0.2 * pulse))
+
+
 func interact(player: Node) -> void:
 	if not enabled:
 		Events.toast.emit("暂时无法使用", UITheme.TEXT_DIM)
@@ -59,6 +83,10 @@ func interact(player: Node) -> void:
 func _draw() -> void:
 	var pulse := 0.5 + 0.5 * sin(_glow_t * 2.4)
 	var c := accent
+	# 增益掉落物要一眼能从背景里挑出来，所以单独一套画法。
+	if kind == "reward":
+		_draw_reward(c, pulse)
+		return
 	# 交互范围提示（地面光圈）
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.32))
 	draw_arc(Vector2(0.0, 0.0), 34.0, 0.0, TAU, 24, Color(c.r, c.g, c.b, 0.10 + 0.10 * pulse), 2.0)

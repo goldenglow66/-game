@@ -36,7 +36,6 @@ grow_vertical = 2
 script = ExtResource("1_6v464")
 
 [node name="TitleInfo" type="Label" parent="." unique_id=1709595179]
-visible = false
 layout_mode = 0
 anchor_left = 1.0
 anchor_top = 1.0
@@ -51,7 +50,6 @@ theme_override_font_sizes/font_size = 13
 horizontal_alignment = 2
 
 [node name="Version" type="Label" parent="." unique_id=220025047]
-visible = false
 layout_mode = 0
 anchor_top = 1.0
 anchor_bottom = 1.0
@@ -122,7 +120,6 @@ theme_override_constants/separation = 10
 alignment = 1
 
 [node name="BtnResume" type="Button" parent="MenuPanel/MenuMargin/MenuVBox" unique_id=1904803722]
-visible = false
 layout_mode = 2
 size_flags_horizontal = 3
 text = "继 续 本 局"
@@ -148,7 +145,6 @@ size_flags_horizontal = 3
 text = "退 出 游 戏"
 
 [node name="ConfirmLayer" type="Control" parent="." unique_id=750385824]
-visible = false
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0

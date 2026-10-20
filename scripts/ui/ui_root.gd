@@ -441,22 +441,36 @@ func _build_gameover() -> void:
 		Sfx.play("ui_confirm")
 		goto_screen("goto_hub")
 	)
-	b.custom_minimum_size = Vector2(260, 42)
+	# 结算页只有一个出口，点不中的代价是卡死在这一屏，所以按钮做得比别处大一圈。
+	b.custom_minimum_size = Vector2(320, 56)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(b)
 
 
 # ================= 屏幕状态 =================
 
-func show_title() -> void:
-	set_paused(false)
-	mode = Mode.TITLE
-	title_layer.visible = true
+## 切屏前把所有浮层收干净。
+##
+## 之前每个 show_* 各自手写「要关哪几层」，先后漏掉过 archive / settings / panel / reward。
+## 这类残留只有在「浮层开着时被强制切屏」才会暴露 —— 最典型的是在局内商店面板前被打死：
+## 面板不暂停游戏，人被打死后 panel_layer 仍是 visible，残留的全屏 Control 垫在结算页上面，
+## 把唯一的出口按钮挡掉，玩家就卡死在结算画面。统一在这里收口，新加浮层只要补一行。
+func _hide_overlays() -> void:
+	panel_layer.visible = false
+	panel_open = false
+	panel_kind = ""
 	archive_layer.visible = false
 	settings_layer.visible = false
 	gameover_layer.visible = false
-	panel_layer.visible = false
-	panel_open = false
+	if reward != null:
+		reward.visible = false
+
+
+func show_title() -> void:
+	set_paused(false)
+	_hide_overlays()
+	mode = Mode.TITLE
+	title_layer.visible = true
 	hud.visible = false
 	interact_label.modulate.a = 0.0
 	title_layer.call("set_info", "已出击 %d 次 · 最长下潜 %d 扇区 · 织网碎片 %d" % [
@@ -480,28 +494,31 @@ func _refresh_title_entry() -> void:
 
 func show_hub() -> void:
 	set_paused(false)
+	_hide_overlays()
 	mode = Mode.HUB
 	title_layer.visible = false
-	gameover_layer.visible = false
 	hud.visible = true
 	_release_ui_focus()
 
 
 func show_hud() -> void:
 	set_paused(false)
+	_hide_overlays()
 	mode = Mode.RUN
 	title_layer.visible = false
-	gameover_layer.visible = false
 	hud.visible = true
 	_release_ui_focus()
 
 
 func show_gameover(victory: bool, banked: int) -> void:
 	set_paused(false)
+	_hide_overlays()
 	mode = Mode.GAMEOVER
 	title_layer.visible = false
 	hud.visible = false
 	gameover_layer.visible = true
+	# 结算层压在所有其它 UI 之上：它是终局界面，被任何残留面板盖住都会让玩家走不掉。
+	gameover_layer.z_index = 100
 	gameover_title.text = "断 层 贯 通" if victory else "织 网 中 断"
 	gameover_title.add_theme_color_override("font_color", UITheme.CYAN if victory else UITheme.RED)
 	for c in gameover_body.get_children():
@@ -1288,8 +1305,10 @@ func _process(delta: float) -> void:
 	_t += delta
 	hud.run_ref = Game.run
 	hud.in_run = (mode == Mode.RUN)
-	# Boss 血条只挂在还活着的 Boss 身上；它一死就撤掉
-	if _boss != null and (not is_instance_valid(_boss) or not bool(_boss.call("is_alive"))):
+	# Boss 血条只挂在还活着的 Boss 身上；它一死（或被场景切走）就撤掉。
+	# 注意：对象被 free 之后 `_boss != null` 会返回 **false**（Godot 把 freed 引用当成 null），
+	# 所以这里必须用 is_instance_valid 判断，否则会漏清、再把 freed 引用赋给强类型属性而报错。
+	if not is_instance_valid(_boss) or not bool(_boss.call("is_alive")):
 		_boss = null
 	hud.boss_ref = _boss
 	hud.tick(delta)
@@ -1359,6 +1378,13 @@ func _update_interact_hint() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# 三选一优先级最高：它自己处理键盘，这里不要抢
 	if reward != null and reward.is_open():
+		return
+
+	# 结算界面：Esc 直接回安全屋，鼠标点不动时至少有键盘能走。
+	if mode == Mode.GAMEOVER:
+		if event.is_action_pressed("pause") or event.is_action_pressed("cancel") or event.is_action_pressed("confirm"):
+			goto_screen("goto_hub")
+			get_viewport().set_input_as_handled()
 		return
 
 	# Esc：按层级从外到里逐层关闭 —— 设置 / 存档界面 → 据点面板 → 暂停。

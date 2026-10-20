@@ -157,9 +157,12 @@ func _room_width(kind: int) -> float:
 
 ## 三层平台：低层可直接跳上，中/高层需要踩下层起跳
 func _build_platforms(r: Room) -> void:
-	var low := int(rng.randi_range(2, 4))
-	var mid := int(rng.randi_range(1, 3))
-	var high := int(rng.randi_range(0, 2))
+	# 每层最多两块。以前 low 层会刷 2~4 块、mid 层 1~3 块，
+	# 同层挤成三块几乎连在一起，加上上下两层水平方向也可能重叠，
+	# 整片看起来就是「三块板粘在一块」。宁少勿挤。
+	var low := int(rng.randi_range(1, 2))
+	var mid := int(rng.randi_range(1, 2))
+	var high := int(rng.randi_range(0, 1))
 	if r.kind == Room.Kind.BOSS:
 		low = 2
 		mid = 2
@@ -168,21 +171,57 @@ func _build_platforms(r: Room) -> void:
 		low = 1
 		mid = 1
 		high = 0
-	_place_platform_row(r, low, -180.0, -128.0, 200.0, 360.0)
-	_place_platform_row(r, mid, -345.0, -285.0, 180.0, 300.0)
-	_place_platform_row(r, high, -510.0, -445.0, 160.0, 260.0)
+	# 三层各自错开相位：相同 count 的两层如果都用同一套槽位，
+	# 上层的板会正好压在下层板的正上方，看起来就是「好几块板叠在一起」。
+	_place_platform_row(r, low, -180.0, -128.0, 200.0, 360.0, 0.0)
+	_place_platform_row(r, mid, -345.0, -285.0, 180.0, 300.0, 0.5)
+	_place_platform_row(r, high, -510.0, -445.0, 160.0, 260.0, 0.25)
 
 
-func _place_platform_row(r: Room, count: int, y_min: float, y_max: float, w_min: float, w_max: float) -> void:
+func _place_platform_row(r: Room, count: int, y_min: float, y_max: float, w_min: float, w_max: float, phase_shift: float = 0.0) -> void:
 	if count <= 0:
 		return
+	# 同一层所有平台共用一个高度，并且对齐到 8 的倍数。
+	# 每块平台各自随机浮点高度，会让同层的板子高低不齐、边缘落在亚像素上，
+	# 看起来像「两块区域叠在一起又错开」，高低差很小时还会卡脚。
+	var y := roundf(rng.randf_range(y_min, y_max) / 8.0) * 8.0
+	# 把房间横向切成 count + 1 段，一块平台只在自己那一段里活动。
 	var seg := r.width() / float(count + 1)
+	var gap := 90.0
+	var max_w := maxf(seg - gap * 2.0, 90.0)
+	var jitter := seg * 0.10
 	for i in count:
-		var cx: float = r.x_start + seg * float(i + 1) + rng.randf_range(-seg * 0.18, seg * 0.18)
-		var pw := rng.randf_range(w_min, w_max)
-		cx = clampf(cx, r.x_start + pw * 0.5 + 60.0, r.x_end - pw * 0.5 - 60.0)
-		var y := rng.randf_range(y_min, y_max)
-		r.platforms.append(Rect2(cx - pw * 0.5, y, pw, 28.0))
+		var slot_x := r.x_start + seg * (float(i + 1) + phase_shift)
+		var pw := minf(roundf(rng.randf_range(w_min, w_max)), roundf(max_w))
+		pw = maxf(pw, 90.0)
+		# 试着放 8 次：只要跟「竖直方向靠得近」的已有平台横向撞上，就换个位置再试。
+		# 单靠 phase_shift 平移是不够的 —— 上下两层数量不同时，段宽不一样，
+		# 一块很容易正好落在下层两块中间，宽度一大就叠在一起。
+		var x0 := -1.0
+		for attempt in 8:
+			var cx := slot_x + rng.randf_range(-jitter, jitter)
+			cx = clampf(cx, r.x_start + pw * 0.5 + gap, r.x_end - pw * 0.5 - gap)
+			var candidate := roundf(cx - pw * 0.5)
+			if _platform_slot_free(r, candidate, pw, y, gap):
+				x0 = candidate
+				break
+		if x0 < 0.0:
+			continue  # 实在放不下就少放一块，宁缺勿挤
+		r.platforms.append(Rect2(x0, y, pw, 28.0))
+
+
+## 竖直方向隔得远（超过一层半）的平台互不遮挡，可以随便叠；
+## 靠得近的要求横向至少留 gap，否则视觉上就是「几块板粘在一起」。
+func _platform_slot_free(r: Room, x0: float, pw: float, y: float, gap: float) -> bool:
+	for p in r.platforms:
+		if absf(p.position.y - y) > 200.0:
+			continue
+		if x0 + pw + gap <= p.position.x:
+			continue
+		if p.position.x + p.size.x + gap <= x0:
+			continue
+		return false
+	return true
 
 
 func _build_room_solids(r: Room) -> void:
@@ -292,9 +331,9 @@ func _draw() -> void:
 			draw_rect(Rect2(p.position.x, p.position.y, 3.0, p.size.y), Color(c_accent.r, c_accent.g, c_accent.b, 0.18))
 			draw_rect(Rect2(p.position.x + p.size.x - 3.0, p.position.y, 3.0, p.size.y), Color(c_accent.r, c_accent.g, c_accent.b, 0.18))
 
-		# 房间立柱
-		draw_rect(Rect2(r.x_end - 12.0, r.ceiling_y - CEIL_THICK, 24.0, absf(r.ceiling_y) + CEIL_THICK), c_mid)
-		draw_rect(Rect2(r.x_end - 2.0, r.ceiling_y - CEIL_THICK, 4.0, absf(r.ceiling_y) + CEIL_THICK), Color(c_glow.r, c_glow.g, c_glow.b, 0.5))
+		# 房间之间的立柱不再绘制：它从天花板一路贯到地板，中间还有一条发光芯，
+		# 每个房间边界都来一根，看起来就像一排光柱把画面切成小格子。
+		# 房间的分隔交给 gate（关起来时才有实体感）与地面的几何差异去体现。
 
 
 func room_at(x: float) -> Room:

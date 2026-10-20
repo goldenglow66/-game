@@ -27,6 +27,12 @@ const RECOVER_TIME := 0.30
 
 enum State { IDLE, PATROL, CHASE, WINDUP, RECOVER, HURT, DEAD }
 
+## 接触伤害的判定范围：横向半宽与纵向容差（敌人身高约 60~80，给足上下浮动）。
+const CONTACT_RADIUS := 24.0
+const CONTACT_HEIGHT := 64.0
+## 接触伤害相对主动挥击的比例。贴脸本来就危险，但不该比正经挨一击还疼。
+const CONTACT_DAMAGE_RATIO := 0.6
+
 var id: String = ""
 var def: Dictionary = {}
 
@@ -279,6 +285,9 @@ func _physics_process(delta: float) -> void:
 
 	_think(delta)
 
+	# 接触伤害：只要贴到玩家身上就掉血，不用等它抬手挥击。
+	_check_contact_damage()
+
 	if behavior != EnemyDB.FLYER:
 		velocity.y = minf(MAX_FALL, velocity.y + GRAVITY * delta)
 
@@ -426,6 +435,35 @@ func _release_attack() -> void:
 		_fire_volley()
 	else:
 		_melee_strike()
+
+
+## 接触伤害：敌人自带「碰撞箱」，贴身就掉血。
+##
+## 主动挥击那一下由 `_melee_strike()` 结算，所以 WINDUP/RECOVER 两态跳过这里，
+## 免得同一帧吃两份伤害。玩家侧有 0.55 秒无敌帧，因此即使这里每帧调用，
+## 实际也只会生效一次，不会出现「贴着就被吸干」。
+func _check_contact_damage() -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	if not target.has_method("take_hit"):
+		return
+	if state == State.WINDUP or state == State.RECOVER:
+		return
+	if state == State.DEAD or state == State.HURT:
+		return
+	var d: Vector2 = target.global_position - global_position
+	if absf(d.x) > CONTACT_RADIUS or absf(d.y) > CONTACT_HEIGHT:
+		return
+	target.take_hit({
+		"amount": damage * CONTACT_DAMAGE_RATIO,
+		"poise": 3.0,
+		"kind": "contact",
+		"crit": false,
+		"position": target.global_position,
+		"source": self,
+		"source_position": global_position,
+		"knockback": Vector2(signf(d.x) * 260.0, -140.0),
+	})
 
 
 func _melee_strike() -> void:
@@ -626,19 +664,21 @@ func _drop_loot() -> void:
 	if parent == null:
 		return
 	var pickup_script := preload("res://scripts/world/pickup.gd")
+	# 敌人站在地面上，自己的 Y 就是这一层地面的全局高度，直接传下去。
+	var ground := global_position.y
 	var n := 1 if shard_value <= 4 else 2
 	for i in n:
 		var p = pickup_script.new()
 		p.setup("shard", maxi(1, int(round(float(shard_value) / float(n)))), accent,
-			global_position + Vector2(randf_range(-24.0, 24.0), -30.0))
+			global_position + Vector2(randf_range(-24.0, 24.0), -30.0), ground)
 		parent.add_child(p)
 	if coin_value > 0 and randf() < 0.55:
 		var c = pickup_script.new()
-		c.setup("coin", coin_value, Color("e8c86a"), global_position + Vector2(randf_range(-20.0, 20.0), -34.0))
+		c.setup("coin", coin_value, Color("e8c86a"), global_position + Vector2(randf_range(-20.0, 20.0), -34.0), ground)
 		parent.add_child(c)
 	if randf() < 0.06:
 		var h = pickup_script.new()
-		h.setup("hp", 18, Color("e0554f"), global_position + Vector2(randf_range(-20.0, 20.0), -38.0))
+		h.setup("hp", 18, Color("e0554f"), global_position + Vector2(randf_range(-20.0, 20.0), -38.0), ground)
 		parent.add_child(h)
 
 

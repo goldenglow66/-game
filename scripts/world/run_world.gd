@@ -476,6 +476,34 @@ func _offer_reward(r: Room) -> void:
 	if choices.is_empty():
 		return
 	run.pending_choice = choices
+	_spawn_reward_drops(r, choices)
+
+
+## 清房后只在地上放一枚「增益箱」。
+##
+## 三选一界面本身保留，但它不再由清房自动弹出 —— 玩家得自己走过去按 E 打开。
+## 这样战斗节奏不会被硬中断，捡不捡、什么时候捡都由玩家决定。
+func _spawn_reward_drops(r: Room, choices: Array) -> void:
+	var cx: float = (r.x_start + r.x_end) * 0.5
+	var it := Interactable.new()
+	it.setup(
+		"reward",
+		"增益箱",
+		"打开 · 三选一",
+		Vector2(40.0, 64.0),
+		UITheme.GOLD,
+	)
+	level.add_child(it)
+	it.global_position = level.to_global(Vector2(cx, r.floor_y - 8.0))
+	it.used.connect(func(_p: Node) -> void: _on_reward_drop_used(it, choices))
+
+
+func _on_reward_drop_used(drop: Interactable, choices: Array) -> void:
+	if drop != null and is_instance_valid(drop):
+		drop.queue_free()
+	if run == null or choices.is_empty():
+		return
+	# 这里才弹三选一：是玩家主动按的 E，不是战斗被系统打断。
 	Events.reward_choices_offered.emit(choices)
 
 
