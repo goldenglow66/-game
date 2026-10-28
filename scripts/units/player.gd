@@ -1040,11 +1040,8 @@ func _draw() -> void:
 	draw_line(hand, tip, Color(edge.r, edge.g, edge.b, alpha * 0.8), 3.0)
 	draw_line(hand, tip, Color(blade_col.r, blade_col.g, blade_col.b, alpha * 0.85), 1.4)
 
-	# 挥砍残影
-	if action == "attack" and not swing_hit and float(current_swing.get("reach", 0.0)) > 0.0:
-		var w: float = float(current_swing.get("h", 46.0))
-		var r: float = float(current_swing.get("reach", 46.0))
-		draw_rect(Rect2(6.0 * f - (0.0 if f > 0 else r), -w - 6.0, r, w), Color(blade_col.r, blade_col.g, blade_col.b, 0.10))
+	# 原来的「挥砍残影」是一块半透明矩形，正好盖住整片攻击判定范围，
+	# 出手时看起来像给玩家套了个方框。已去掉，打击反馈交给剑刃本身与命中火花。
 
 	# 蓄力光环
 	if charging and charge_t >= CHARGE_TIME:

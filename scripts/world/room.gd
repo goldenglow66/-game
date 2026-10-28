@@ -31,6 +31,9 @@ const KIND_NAME := {
 # ---- 几何（由 level.gd 生成时填入） ----
 var index: int = 0                    # 在本扇区里的序号，0 起
 var kind: int = Kind.COMBAT
+## 难度等级 1~5。由 `level.gd` 按「抛物线」分配：一层两头的怪物房简单、
+## 越靠近中间越难。道具房恒为 1（没有战斗）。
+var tier: int = 1
 var x_start: float = 0.0              # 左边界（世界坐标）
 var x_end: float = 0.0                # 右边界
 var floor_y: float = 0.0              # 地面高度（玩家站立线）

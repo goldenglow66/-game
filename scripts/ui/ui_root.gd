@@ -237,10 +237,16 @@ func _on_title_action(id: String) -> void:
 		"resume_run":
 			Sfx.play("ui_confirm")
 			# 首格「继续本局」/「进入安全屋」按存档有无切换行为。
-			if Game.has_run_save():
+			if not Game.has_any_save():
+				goto_screen("goto_hub")
+			elif Game.slot_count_saved() > 0 and Game.has_run_save():
+				# 既有当前进度又有栏位存档：让玩家自己挑一本，而不是默认读当前那本。
+				show_archive(true)
+			elif Game.has_run_save():
 				goto_screen("resume_run")
 			else:
-				goto_screen("goto_hub")
+				# 只有栏位存档，没有正在进行的那一局：直接进选择界面。
+				show_archive(true)
 		"abandon_run":
 			# 只清掉进行中的这一局，人留在标题页；首格随之退回「进入安全屋」。
 			Game.clear_run_save()
@@ -309,12 +315,21 @@ func _slot_rows() -> Array:
 	return rows
 
 
-func show_archive() -> void:
+## play = true 时界面切成「挑一本存档开玩」：只留「开始」，隐藏存入与删除。
+func show_archive(play: bool = false) -> void:
+	archive_layer.call("set_mode", play)
 	archive_layer.call("refresh", _slot_rows())
-	var status := "当前进度可存入任意栏位"
-	if not Game.has_run_save():
-		status = "当前没有可存入的进度"
-	archive_layer.call("set_status", status)
+	if play:
+		var n := Game.slot_count_saved()
+		archive_layer.call(
+			"set_status",
+			"选一本存档继续本场下潜 · 共 %d 本" % n if n > 0 else "还没有存过栏位存档",
+		)
+	else:
+		var status := "当前进度可存入任意栏位"
+		if not Game.has_run_save():
+			status = "当前没有可存入的进度"
+		archive_layer.call("set_status", status)
 	archive_layer.visible = true
 	archive_layer.call("focus_first")
 
@@ -383,6 +398,10 @@ func _on_archive_action(id: String) -> void:
 		_hide_archive()
 
 
+## 栏位界面里唯一的行为入口。四种操作的区别：
+## - save / delete 只动「栏位文件」，不碰当前进度；
+## - load 把栏位盖回当前进度，界面留着让人自己点「继续本局」；
+## - play 是同一个动作，但选完直接进游戏——这是标题页「继续本局」那条路径用的。
 func _on_archive_slot(id: String, index: int) -> void:
 	var n := index + 1
 	match id:
@@ -401,6 +420,18 @@ func _on_archive_slot(id: String, index: int) -> void:
 			else:
 				Sfx.play("ui_deny")
 				Events.toast.emit("栏位 %d 读数失败" % n, UITheme.RED)
+		"play":
+			# 先把栏位复制成当前进度，再走和「继续本局」完全相同的续关流程，
+			# 这样「从栏位开玩」和「接着上次玩」不会长出两套读档逻辑。
+			if not Game.load_slot(index):
+				Sfx.play("ui_deny")
+				Events.toast.emit("栏位 %d 读数失败" % n, UITheme.RED)
+				archive_layer.call("refresh", _slot_rows())
+				return
+			Sfx.play("ui_confirm")
+			_hide_archive()
+			goto_screen("resume_run")
+			return
 		"delete":
 			Game.delete_slot(index)
 			Sfx.play("ui_deny")
@@ -479,17 +510,18 @@ func show_title() -> void:
 		Game.shards_bank,
 	])
 	title_layer.call("set_resume_visible", true)
-	title_layer.call("set_resume_text", "继 续 本 局" if Game.has_run_save() else "进 入 安 全 屋")
+	title_layer.call("set_resume_text", "继 续 本 局" if Game.has_any_save() else "进 入 安 全 屋")
 	title_layer.call("set_abandon_enabled", Game.has_run_save())
 	_focus_first_button()
 
 
 ## 标题页首格兼入口：有存档 =「继续本局」，无存档 =「进入安全屋」。
+## 「放弃本局」只看当前那一局在不在，栏位存档不归它管。
 func _refresh_title_entry() -> void:
-	var has_save := Game.has_run_save()
+	var has_any := Game.has_any_save()
 	title_layer.call("set_resume_visible", true)
-	title_layer.call("set_resume_text", "继 续 本 局" if has_save else "进 入 安 全 屋")
-	title_layer.call("set_abandon_enabled", has_save)
+	title_layer.call("set_resume_text", "继 续 本 局" if has_any else "进 入 安 全 屋")
+	title_layer.call("set_abandon_enabled", Game.has_run_save())
 
 
 func show_hub() -> void:

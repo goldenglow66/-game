@@ -269,6 +269,21 @@ func has_run_save() -> bool:
 	return not read_run_save().is_empty()
 
 
+## 有几本存档栏位存了东西。
+func slot_count_saved() -> int:
+	var n := 0
+	for i in SLOT_COUNT:
+		if not slot_meta(i).is_empty():
+			n += 1
+	return n
+
+
+## 有没有任何可以开玩的进度：当前运行存档，或任意一个栏位。
+## 标题页用它决定「继续本局」是否出现。
+func has_any_save() -> bool:
+	return has_run_save() or slot_count_saved() > 0
+
+
 func clear_run_save() -> void:
 	if not FileAccess.file_exists(RUN_SAVE_PATH):
 		return

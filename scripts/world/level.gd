@@ -9,6 +9,9 @@ const FLOOR_THICK := 260.0
 const CEIL_THICK := 220.0
 const GATE_W := 26.0
 
+## 怪物房难度的上限。抛物线从 1 爬到 TIER_MAX 再降回 1。
+const TIER_MAX := 5
+
 ## 扇区主题（名字取自设定文档的世界结构）
 const THEMES := [
 	{
@@ -115,6 +118,7 @@ func generate(p_floor: int, p_rng: RandomNumberGenerator) -> void:
 		rooms.append(r)
 		x = r.x_end
 	total_width = x
+	_assign_tiers()
 	_fill_room_contents()
 	_build_gates()
 	queue_redraw()
@@ -122,28 +126,63 @@ func generate(p_floor: int, p_rng: RandomNumberGenerator) -> void:
 
 ## 抽房间序列。返回的类型数组第一个是 START、最后一个是 BOSS。
 ##
-## 中间间的规则：纯随机抽，但**连续两个功能房会被强制插一个战斗房** ——
-## 否则可能抽出一串「商店→休整→事件」，整层没有仗打。
+## 【区块】借鉴以撒的房间组织方式，搬到横板线性关卡上：中间的房间按「块」分组，
+## **一块里要么全是怪物房、要么全是道具房**，两类不会混在同一块。
+## 块的顺序固定为 怪物 → 道具 → 怪物：前后两个怪物块各自邻着起点与 Boss，
+## 天然构成「两头简单」区；道具块夹在中间，刚好在玩家打累的时候出现。
+##
+## 【抛物线难度】怪物房的 `tier` 不在这里定，由 `_assign_tiers()` 按它在整层里的
+## 相对位置算：两头 1、中间 5。
 func _roll_layout() -> Array[int]:
 	var kinds: Array[int] = []
 	kinds.append(Room.Kind.START)
-	var middle := 4 + (floor_index % 2)          # 4~5 个中间房间
-	if floor_index >= 4:
-		middle = 6
-	var pool := [
-		Room.Kind.COMBAT, Room.Kind.COMBAT, Room.Kind.COMBAT, Room.Kind.COMBAT,
-		Room.Kind.ELITE, Room.Kind.EVENT, Room.Kind.REWARD, Room.Kind.REST, Room.Kind.SHOP,
-	]
-	var last_kind := -1
-	for i in middle:
-		var pick: int = pool[rng.randi() % pool.size()]
-		# 避免连续出现功能房，保证战斗密度
-		if pick != Room.Kind.COMBAT and last_kind != Room.Kind.COMBAT and i > 0:
-			pick = Room.Kind.COMBAT
-		kinds.append(pick)
-		last_kind = pick
+
+	# 固定三块：怪物块 → 道具块 → 怪物块。
+	# 这样「两头简单中间难」的抛物线才有落点：前后两个怪物块各自邻着
+	# 起点和 Boss，天然是简单区；道具块夹在中间，不打断战斗节奏。
+	var blocks := [true, false, true]
+	for is_monster: bool in blocks:
+		# 怪物块 2 间（凑够抛物线需要的样本），道具块 1 间（商店/维修站各占一间刚好）。
+		var n := 2 if is_monster else 1
+		for i in n:
+			kinds.append(Room.Kind.COMBAT if is_monster else _roll_service_kind())
+
 	kinds.append(Room.Kind.BOSS)
 	return kinds
+
+
+## 道具块里的具体房间类型。怪物块用 COMBAT，这里不会返回战斗类。
+func _roll_service_kind() -> int:
+	var pool := [Room.Kind.SHOP, Room.Kind.REST, Room.Kind.EVENT, Room.Kind.REWARD]
+	return pool[rng.randi() % pool.size()]
+
+
+## 给战斗房按「抛物线」分配难度等级。
+##
+## 难度曲线 1 - (2t-1)²：t=0 和 t=1 处为 0，t=0.5 处为 1。
+## 于是 tier = 1 + (TIER_MAX-1) × 曲线 —— 开头简单、中段最难、收尾又轻松。
+##
+## 这里的 t 取房间在【整层】里的相对位置（index / 总房间数-1），而不是
+## 在「战斗房序列」里的位置。两种取法在只有 4 个战斗房时差别很大：
+## 前者算出 [3,5,5,3]（贴近起点的房间不会突然最难），
+## 后者算出 [1,5,5,1]（首尾直接顶到两端，中间一步跳到最高）。
+## 关卡只有 4 个战斗房时前者更像真正的抛物线。
+##
+## 精英房无论如何至少 3 级 —— 它存在的意义就是难。
+func _assign_tiers() -> void:
+	var total := rooms.size()
+	if total <= 1:
+		return
+	for r in rooms:
+		if r.kind != Room.Kind.COMBAT and r.kind != Room.Kind.ELITE:
+			r.tier = 1
+			continue
+		var t := float(r.index) / float(total - 1)
+		var curve := 1.0 - pow(2.0 * t - 1.0, 2.0)
+		var tier := 1 + roundi(float(TIER_MAX - 1) * curve)
+		if r.kind == Room.Kind.ELITE:
+			tier = maxi(tier, 3)
+		r.tier = clampi(tier, 1, TIER_MAX)
 
 
 func _room_width(kind: int) -> float:
@@ -151,12 +190,18 @@ func _room_width(kind: int) -> float:
 		Room.Kind.START: return 900.0
 		Room.Kind.BOSS: return 2200.0
 		Room.Kind.ELITE: return rng.randf_range(1500.0, 1800.0)
-		Room.Kind.REWARD, Room.Kind.SHOP, Room.Kind.REST, Room.Kind.EVENT: return 1100.0
+		# 道具房只是一间「看一眼就走」的房间，比战斗房短得多。
+		Room.Kind.REWARD, Room.Kind.SHOP, Room.Kind.REST, Room.Kind.EVENT: return 820.0
 	return rng.randf_range(1400.0, 1950.0)
 
 
 ## 三层平台：低层可直接跳上，中/高层需要踩下层起跳
 func _build_platforms(r: Room) -> void:
+	# 道具房（商店/恢复/事件/数据舱）不放任何平台：这类房间是「进门-交互-出门」动线，
+	# 平台只会挡住视线和路径。战斗类房间才需要垂直结构。
+	match r.kind:
+		Room.Kind.REWARD, Room.Kind.SHOP, Room.Kind.REST, Room.Kind.EVENT:
+			return
 	# 每层最多两块。以前 low 层会刷 2~4 块、mid 层 1~3 块，
 	# 同层挤成三块几乎连在一起，加上上下两层水平方向也可能重叠，
 	# 整片看起来就是「三块板粘在一块」。宁少勿挤。
@@ -247,11 +292,12 @@ func _fill_room_contents() -> void:
 	for r in rooms:
 		match r.kind:
 			Room.Kind.COMBAT:
-				r.spawn_count = clampi(3 + floori(float(floor_index) * 0.5), 3, 7)
+				# 数量跟着 tier 走：1 级 3 只，5 级 7 只。
+				r.spawn_count = clampi(2 + r.tier, 3, 7)
 				r.enemy_ids = EnemyDB.roll_pack(rng, floor_index, r.spawn_count, false)
 			Room.Kind.ELITE:
 				var eids: Array = EnemyDB.roll_pack(rng, floor_index, 1, true)
-				eids.append_array(EnemyDB.roll_pack(rng, floor_index, 2, false))
+				eids.append_array(EnemyDB.roll_pack(rng, floor_index, 1 + r.tier / 2, false))
 				r.enemy_ids = eids
 				r.spawn_count = eids.size()
 			Room.Kind.BOSS:

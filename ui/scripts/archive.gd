@@ -28,6 +28,9 @@ const SLOT_COUNT := 5
 var _slots: Array[PanelContainer] = []
 ## 待确认删除的栏位下标；-1 表示当前没有挂起的删除。
 var _pending_delete: int = -1
+## true = 「挑一个存档开玩」模式：每行只留一个「开始」主按钮，
+## 存档管理用的「存入 / 删除」收起来。
+var play_mode: bool = false
 
 
 func _ready() -> void:
@@ -47,7 +50,8 @@ func _ready() -> void:
 
 		var idx := i
 		btn_save.pressed.connect(func() -> void: slot_action.emit("save", idx))
-		btn_load.pressed.connect(func() -> void: slot_action.emit("load", idx))
+		# 同一个按钮两种语义：管理模式是「读取」，开玩模式是「开始」。
+		btn_load.pressed.connect(func() -> void: slot_action.emit("play" if play_mode else "load", idx))
 		btn_del.pressed.connect(func() -> void: _ask_delete(idx))
 		btn_save.mouse_entered.connect(func() -> void: hover.emit("slot_save"))
 		btn_load.mouse_entered.connect(func() -> void: hover.emit("slot_load"))
@@ -63,6 +67,23 @@ func _ready() -> void:
 	_btn_cancel.pressed.connect(func() -> void: _hide_confirm())
 	for b in [_btn_confirm, _btn_cancel]:
 		(b as Button).mouse_entered.connect(func() -> void: hover.emit("confirm"))
+
+
+## 切换用法。
+## play = true 时这个界面变成「选一本存档开玩」：隐藏存入与删除，
+## 「读取」改名「开始」，标题与底栏文案也跟着换。
+func set_mode(play: bool) -> void:
+	play_mode = play
+	var head := $Center/Panel/PanelMargin/PanelVBox/Head/HeadTitle as Label
+	if head != null:
+		head.text = "选 择 存 档" if play else "存 档 栏 位"
+	_back.text = "返 回" if play else "返回标题"
+	_status.text = "选一本存档继续本场下潜" if play else ""
+	for i in _slots.size():
+		var row := _slots[i]
+		_btn(row, "save").visible = not play
+		_btn(row, "delete").visible = not play
+		_btn(row, "load").text = "开 始" if play else "读 取"
 
 
 ## 删除是不可逆的，先问一句。
@@ -128,7 +149,6 @@ func refresh(rows: Array) -> void:
 		var has_data := bool(r.get("has_data", false))
 		_btn(row, "load").disabled = not has_data
 		_btn(row, "delete").disabled = not has_data
-
 
 func set_status(text: String) -> void:
 	_status.text = text

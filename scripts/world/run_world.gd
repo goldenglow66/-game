@@ -483,8 +483,15 @@ func _offer_reward(r: Room) -> void:
 ##
 ## 三选一界面本身保留，但它不再由清房自动弹出 —— 玩家得自己走过去按 E 打开。
 ## 这样战斗节奏不会被硬中断，捡不捡、什么时候捡都由玩家决定。
+## 箱子生成在**玩家脚下**，而不是房间正中：一场混战打下来玩家可能站在任意角落，
+## 落在房间中心会逼他满房间找。
 func _spawn_reward_drops(r: Room, choices: Array) -> void:
-	var cx: float = (r.x_start + r.x_end) * 0.5
+	var drop_pos := Vector2((r.x_start + r.x_end) * 0.5, r.floor_y - 8.0)
+	if player != null and is_instance_valid(player):
+		drop_pos = player.position
+		drop_pos.y = r.floor_y - 8.0
+		# 别正好压在玩家身上，稍微往旁边错开一点，免得站着不动就自动触发摇杆
+		drop_pos.x += 26.0
 	var it := Interactable.new()
 	it.setup(
 		"reward",
@@ -494,7 +501,7 @@ func _spawn_reward_drops(r: Room, choices: Array) -> void:
 		UITheme.GOLD,
 	)
 	level.add_child(it)
-	it.global_position = level.to_global(Vector2(cx, r.floor_y - 8.0))
+	it.global_position = level.to_global(drop_pos)
 	it.used.connect(func(_p: Node) -> void: _on_reward_drop_used(it, choices))
 
 

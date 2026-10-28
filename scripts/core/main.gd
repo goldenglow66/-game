@@ -410,7 +410,21 @@ func _run_combatcheck() -> void:
 	print("[COMBAT] cleared=", cur.cleared, " alive_now=", world.get("_active_enemies").size(),
 		" gate_layer=", gate_layer, " shards=", Game.run.shards, " rooms_cleared=", Game.run.rooms_cleared)
 
-	# 清空房间应该弹出三选一：这里自动选第一张，验证「弹窗 → 选择 → 写回 RunState → 恢复游戏」整条链路
+	# 清空房间不再直接弹三选一，而是掉出一个增益箱；玩家按 E 捡起来才弹窗。
+	# 这里直接触发箱子的交互，验证「掉落 → 拾取 → 三选一 → 写回 RunState → 恢复游戏」整条链路。
+	var drop: Node = null
+	for n in lv.get_children():
+		if n is Interactable and (n as Interactable).kind == "reward":
+			drop = n
+			break
+	if drop != null:
+		print("[COMBAT] reward drop spawned at x=", int((drop as Node2D).global_position.x),
+			" player x=", int(p.global_position.x))
+		(drop as Interactable).call("interact", p)
+		await get_tree().create_timer(0.35).timeout
+	else:
+		print("[COMBAT] FAIL no reward drop spawned after clearing the room")
+
 	if ui.reward != null and ui.reward.is_open():
 		var n: int = ui.reward.choices.size()
 		var id0 := str((ui.reward.choices[0] as Dictionary).get("id", ""))
@@ -485,7 +499,9 @@ func _run_bosscheck() -> void:
 		" spawn=", boss_room.spawn_count, " floor=", Game.run.floor_index)
 
 	# ---- 第一层：进 Boss 房、杀光，检查「不给普通词条 / 给元素模块 / 不直接通关」----
-	p.global_position = Vector2(boss_room.center().x, boss_room.floor_y - 60.0)
+	# 注意用 position 而不是 global_position：`RunWorld` 挂在带偏移的 `World` 容器下，
+	# 而 Level 与 Player 是同一个父节点的兄弟，用局部坐标才和 room.center() 对得上。
+	p.position = Vector2(boss_room.center().x, boss_room.floor_y - 60.0)
 	p.velocity = Vector2.ZERO
 	await get_tree().create_timer(0.9).timeout
 	var spawned := _wipe_active(world, p)
@@ -496,7 +512,7 @@ func _run_bosscheck() -> void:
 		" reward_open=", (ui.reward != null and ui.reward.is_open()), " screen=", screen)
 
 	# ---- 出口闸门：Boss 已清，走到扇区尽头应该下潜 ----
-	p.global_position = Vector2(lvl.total_width - 60.0, boss_room.floor_y - 60.0)
+	p.position = Vector2(lvl.total_width - 60.0, boss_room.floor_y - 60.0)
 	p.velocity = Vector2.ZERO
 	await get_tree().create_timer(1.6).timeout
 	print("[BOSS] walked to sector end: floor=", Game.run.floor_index, " screen=", screen)
@@ -511,7 +527,7 @@ func _run_bosscheck() -> void:
 	var lvl2 = world2.get("level")
 	var p2: Player = world2.get("player")
 	var last_room: Room = lvl2.rooms[lvl2.rooms.size() - 1]
-	p2.global_position = Vector2(last_room.center().x, last_room.floor_y - 60.0)
+	p2.position = Vector2(last_room.center().x, last_room.floor_y - 60.0)
 	p2.velocity = Vector2.ZERO
 	await get_tree().create_timer(0.9).timeout
 	var spawned2 := _wipe_active(world2, p2)
@@ -721,11 +737,29 @@ func _run_hackcheck() -> void:
 	print("[HACK] picked target = %s (resist %.2f)" % [str(target.call("label")), best_resist])
 	run.ge = run.max_ge
 	p.global_position = target.global_position + Vector2(90.0, -20.0)
+	# 把目标冻住：headless 里敌人 AI 照样在跑，它一走开骇入就断、根本测不到伤害。
+	# 「移动中被拉断」由下面的中断路径单独覆盖。
+	(target as Node).set_physics_process(false)
+	(target as Node2D).global_position = p.global_position + Vector2(-90.0, 20.0)
 	p.call("_set_ghost", true)
 	await get_tree().create_timer(0.2).timeout
 	print("[HACK] ghost=%s ge=%.0f" % [str(p.ghost_form), run.ge])
 
 	var hp_before: float = float(target.get("hp"))
+	# `_begin_hack()` 挑的是「最近的敌人」，房间里别的家伙可能离得更近，那样骇中的
+	# 就不是我们要检查的那只，hp 读数自然对不上。所以只留目标 + 一只备用（中断测试要用），
+	# 备用那只挪到角落，保证「最近」永远是目标。
+	var spare: Node = null
+	for e in enemies:
+		if e != target and is_instance_valid(e) and bool(e.call("can_be_hacked")):
+			spare = e
+			break
+	for e in enemies:
+		if e != target and e != spare and is_instance_valid(e):
+			(e as Node).queue_free()
+	if spare != null:
+		(spare as Node2D).position = Vector2(200.0, 0.0)
+	await get_tree().process_frame
 	p.call("_begin_hack")
 	var started := bool(p.call("is_hacking"))
 	print("[HACK] begin: hacking=%s need=%.2fs ge=%.0f" % [
@@ -746,12 +780,8 @@ func _run_hackcheck() -> void:
 	print("[HACK] %s" % ("OK damage applied" if hp_after < hp_before else "FAIL no damage"))
 
 	# ---- 中断路径 A：脱离幽灵形态 ----
-	var t2 = null
-	for e in enemies:
-		if is_instance_valid(e) and bool(e.call("can_be_hacked")) and e != target:
-			t2 = e
-			break
-	if t2 == null:
+	var t2 = spare
+	if t2 == null or not is_instance_valid(t2):
 		print("[HACK] (no second target for interrupt test)")
 	else:
 		run.ge = run.max_ge
@@ -818,7 +848,7 @@ func _run_pausecheck() -> void:
 		var x1: float = p.global_position.x
 		Input.action_release("move_right")
 		print("[PAUSE] paused: ui.paused=", ui.paused, " tree.paused=", get_tree().paused,
-			" layer=", ui.pause_layer.visible, " rows=", ui.pause_box.get_child_count(),
+			" layer=", ui.pause_layer.visible, " rows=", ui.pause_layer.get_child_count(),
 			" | player x ", snappedf(x0, 0.1), " -> ", snappedf(x1, 0.1),
 			"  ", ("OK (frozen)" if absf(x1 - x0) < 0.5 else "FAIL (kept moving)"))
 	else:
@@ -835,7 +865,7 @@ func _run_pausecheck() -> void:
 	ui.call("toggle_pause")
 	await get_tree().create_timer(0.1).timeout
 	print("[PAUSE] in run: ui.paused=", ui.paused, " tree.paused=", get_tree().paused,
-		" rows=", ui.pause_box.get_child_count(), " mode=", ui.mode)
+		" rows=", ui.pause_layer.get_child_count(), " mode=", ui.mode)
 	ui.call("set_paused", false)
 	await get_tree().create_timer(0.1).timeout
 	print("[PAUSE] in run resumed: ui.paused=", ui.paused, " tree.paused=", get_tree().paused)
@@ -1011,16 +1041,18 @@ func _run_mapcheck() -> void:
 		lv.generate(0, rng)
 		var widths: Array = []
 		var kinds: Array = []
+		var tiers: Array = []
 		var enemies := 0
 		var plats := 0
 		for r in lv.rooms:
 			widths.append(int(r.x_end - r.x_start))
 			kinds.append(r.kind_name())
+			tiers.append(r.tier)
 			enemies += r.spawn_count
 			plats += r.platforms.size()
 		sigs["%s|%s|%d" % [str(widths), str(kinds), enemies]] = true
 		print("[MAP] seed=", s, " rooms=", lv.rooms.size(), " widths=", widths)
-		print("[MAP]      kinds=", kinds, " enemies=", enemies, " platforms=", plats, " theme=", lv.theme_name())
+		print("[MAP]      kinds=", kinds, " tier=", tiers, " enemies=", enemies, " platforms=", plats, " theme=", lv.theme_name())
 		lv.free()
 	print("[MAP] distinct layouts=", sigs.size(), "/", seeds.size())
 
